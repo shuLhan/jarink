@@ -3,6 +3,11 @@
 
 package deadlinks
 
+import (
+	"slices"
+	"strings"
+)
+
 // Broken store the link with its HTTP status.
 type Broken struct {
 	Link string
@@ -18,5 +23,13 @@ type Result struct {
 func newResult() *Result {
 	return &Result{
 		PageLinks: map[string][]Broken{},
+	}
+}
+
+func (result *Result) sort() {
+	for _, listBroken := range result.PageLinks {
+		slices.SortFunc(listBroken, func(a, b Broken) int {
+			return strings.Compare(a.Link, b.Link)
+		})
 	}
 }

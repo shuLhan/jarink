@@ -3,16 +3,24 @@
 
 package deadlinks
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // Scan the baseUrl for dead links.
 func Scan(baseUrl string) (result *Result, err error) {
 	var logp = `Scan`
-	var worker = newWorker(baseUrl)
+	var wrk *worker
 
-	result, err = worker.run()
+	wrk, err = newWorker(baseUrl)
 	if err != nil {
 		return nil, fmt.Errorf(`%s: %s`, logp, err)
 	}
+
+	result, err = wrk.run()
+	if err != nil {
+		return nil, fmt.Errorf(`%s: %s`, logp, err)
+	}
+
 	return result, nil
 }

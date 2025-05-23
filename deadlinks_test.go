@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestDeadLinks_Scan(t *testing.T) {
-	var testUrl = `http://` + testListenAddress
+	var testUrl = `http://` + testListenAddress + `/`
 
 	type testCase struct {
 		exp     map[string][]deadlinks.Broken
@@ -49,18 +49,24 @@ func TestDeadLinks_Scan(t *testing.T) {
 		baseUrl: testUrl,
 		exp: map[string][]deadlinks.Broken{
 			testUrl: []deadlinks.Broken{{
-				Code: http.StatusNotFound,
 				Link: testUrl + `broken.png`,
-			}, {
 				Code: http.StatusNotFound,
+			}, {
 				Link: testUrl + `brokenPage`,
+				Code: http.StatusNotFound,
+			}, {
+				Link: `https://kilabit.info/brokenPage`,
+				Code: http.StatusNotFound,
 			}},
 			testUrl + `page2`: []deadlinks.Broken{{
+				Link: testUrl + `broken.png`,
 				Code: http.StatusNotFound,
-				Link: testUrl + `broken2.png`,
 			}, {
-				Code: http.StatusNotFound,
 				Link: testUrl + `page2/broken/relative`,
+				Code: http.StatusNotFound,
+			}, {
+				Link: testUrl + `page2/broken2.png`,
+				Code: http.StatusNotFound,
 			}},
 		},
 	}}
