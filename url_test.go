@@ -16,6 +16,9 @@ func TestUrlString(t *testing.T) {
 		exp    string
 	}
 	var listCase = []testCase{{
+		rawUrl: `/page#goto`,
+		exp:    `/page`,
+	}, {
 		rawUrl: `http://127.0.0.1`,
 		exp:    `http://127.0.0.1`,
 	}, {
@@ -27,12 +30,20 @@ func TestUrlString(t *testing.T) {
 	}, {
 		rawUrl: `http://127.0.0.1/page/`,
 		exp:    `http://127.0.0.1/page/`,
+	}, {
+		rawUrl: `http://127.0.0.1/page/#gotoa`,
+		exp:    `http://127.0.0.1/page/`,
+	}, {
+		rawUrl: `http://127.0.0.1/page#gotoa`,
+		exp:    `http://127.0.0.1/page`,
 	}}
 	for _, tcase := range listCase {
 		gotUrl, err := url.Parse(tcase.rawUrl)
 		if err != nil {
 			t.Fatal(err)
 		}
+		gotUrl.Fragment = ""
+		gotUrl.RawFragment = ""
 		var got = gotUrl.String()
 		test.Assert(t, tcase.rawUrl, tcase.exp, got)
 	}

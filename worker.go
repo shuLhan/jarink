@@ -61,6 +61,8 @@ func newWorker(opts ScanOptions) (wrk *worker, err error) {
 	}
 
 	wrk.scanUrl.Path = strings.TrimSuffix(wrk.scanUrl.Path, `/`)
+	wrk.scanUrl.Fragment = ""
+	wrk.scanUrl.RawFragment = ""
 
 	wrk.baseUrl = &url.URL{
 		Scheme: wrk.scanUrl.Scheme,
@@ -219,11 +221,32 @@ func (wrk *worker) processLink(rawParentUrl, val string, kind atom.Atom) {
 		log.Fatal(err)
 	}
 
+	var newUrl *url.URL
+	newUrl, err = url.Parse(val)
+	if err != nil {
+		var linkq = linkQueue{
+			parentUrl: parentUrl,
+			url:       val,
+			kind:      kind,
+		}
+		wrk.markDead(linkq, 700)
+		return
+	}
+	newUrl.Fragment = ""
+	newUrl.RawFragment = ""
+
+	var newUrlStr = strings.TrimSuffix(newUrl.String(), `/`)
+
+	if kind == atom.A && val[0] == '#' {
+		// Ignore link to ID, like `href="#element_id"`.
+		return
+	}
+
 	// val is absolute to parent URL.
 	if val[0] == '/' {
 		// Link to the same domain will queued for scanning.
-		var newUrl = wrk.baseUrl.JoinPath(val)
-		var newUrlStr = strings.TrimSuffix(newUrl.String(), `/`)
+		newUrl = wrk.baseUrl.JoinPath(newUrl.Path)
+		newUrlStr = strings.TrimSuffix(newUrl.String(), `/`)
 		wrk.linkq <- linkQueue{
 			parentUrl: parentUrl,
 			url:       newUrlStr,
@@ -232,18 +255,6 @@ func (wrk *worker) processLink(rawParentUrl, val string, kind atom.Atom) {
 		return
 	}
 	if strings.HasPrefix(val, `http`) {
-		var newUrl *url.URL
-		newUrl, err = url.Parse(val)
-		if err != nil {
-			var linkq = linkQueue{
-				parentUrl: parentUrl,
-				url:       val,
-				kind:      kind,
-			}
-			wrk.markDead(linkq, 700)
-			return
-		}
-		var newUrlStr = strings.TrimSuffix(newUrl.String(), `/`)
 		wrk.linkq <- linkQueue{
 			parentUrl: parentUrl,
 			url:       newUrlStr,
@@ -252,8 +263,8 @@ func (wrk *worker) processLink(rawParentUrl, val string, kind atom.Atom) {
 		return
 	}
 	// val is relative to parent URL.
-	var newUrl = parentUrl.JoinPath(`/`, val)
-	var newUrlStr = strings.TrimSuffix(newUrl.String(), `/`)
+	newUrl = parentUrl.JoinPath(`/`, newUrl.Path)
+	newUrlStr = strings.TrimSuffix(newUrl.String(), `/`)
 	wrk.linkq <- linkQueue{
 		parentUrl: parentUrl,
 		url:       newUrlStr,
