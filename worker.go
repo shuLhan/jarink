@@ -124,13 +124,19 @@ func (wrk *worker) scan(linkq linkQueue) {
 		wrk.errq <- err
 		return
 	}
+	defer httpResp.Body.Close()
+
 	if httpResp.StatusCode != http.StatusOK {
 		wrk.markDead(linkq, httpResp.StatusCode)
 		return
 	}
+	wrk.seenLinkMtx.Lock()
+	wrk.seenLink[linkq.url] = http.StatusOK
+	wrk.seenLinkMtx.Unlock()
 
-	defer httpResp.Body.Close()
-
+	if linkq.kind == atom.Img {
+		return
+	}
 	err = wrk.parseHTML(linkq.url, httpResp.Body)
 	if err != nil {
 		wrk.errq <- fmt.Errorf(`%s %s: %w`, logp, linkq.url, err)
@@ -171,7 +177,7 @@ func (wrk *worker) parseHTML(linkUrl string, body io.Reader) (err error) {
 				if attr.Key != `href` {
 					continue
 				}
-				wrk.processLink(linkUrl, attr.Val)
+				wrk.processLink(linkUrl, attr.Val, atom.A)
 			}
 		}
 		if node.DataAtom == atom.Img {
@@ -179,14 +185,14 @@ func (wrk *worker) parseHTML(linkUrl string, body io.Reader) (err error) {
 				if attr.Key != `src` {
 					continue
 				}
-				wrk.processLink(linkUrl, attr.Val)
+				wrk.processLink(linkUrl, attr.Val, atom.Img)
 			}
 		}
 	}
 	return nil
 }
 
-func (wrk *worker) processLink(rawParentUrl string, val string) {
+func (wrk *worker) processLink(rawParentUrl string, val string, kind atom.Atom) {
 	if len(val) == 0 {
 		return
 	}
@@ -207,6 +213,7 @@ func (wrk *worker) processLink(rawParentUrl string, val string) {
 		wrk.linkq <- linkQueue{
 			parentUrl: parentUrl,
 			url:       newUrlStr,
+			kind:      kind,
 		}
 		return
 	}
@@ -217,6 +224,7 @@ func (wrk *worker) processLink(rawParentUrl string, val string) {
 			var linkq = linkQueue{
 				parentUrl: parentUrl,
 				url:       val,
+				kind:      kind,
 			}
 			wrk.markDead(linkq, 700)
 			return
@@ -225,6 +233,7 @@ func (wrk *worker) processLink(rawParentUrl string, val string) {
 		wrk.linkq <- linkQueue{
 			parentUrl: parentUrl,
 			url:       newUrlStr,
+			kind:      kind,
 		}
 		return
 	}
@@ -234,5 +243,6 @@ func (wrk *worker) processLink(rawParentUrl string, val string) {
 	wrk.linkq <- linkQueue{
 		parentUrl: parentUrl,
 		url:       newUrlStr,
+		kind:      kind,
 	}
 }

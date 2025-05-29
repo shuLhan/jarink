@@ -3,9 +3,14 @@
 
 package deadlinks
 
-import "net/url"
+import (
+	"net/url"
+
+	"golang.org/x/net/html/atom"
+)
 
 type linkQueue struct {
 	parentUrl *url.URL
 	url       string
+	kind      atom.Atom
 }
