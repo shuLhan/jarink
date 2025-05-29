@@ -8,11 +8,11 @@ import (
 )
 
 // Scan the baseUrl for dead links.
-func Scan(baseUrl string) (result *Result, err error) {
+func Scan(opts ScanOptions) (result *Result, err error) {
 	var logp = `Scan`
 	var wrk *worker
 
-	wrk, err = newWorker(baseUrl)
+	wrk, err = newWorker(opts)
 	if err != nil {
 		return nil, fmt.Errorf(`%s: %s`, logp, err)
 	}

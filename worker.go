@@ -37,6 +37,8 @@ type worker struct {
 	// The URL to scan.
 	scanUrl *url.URL
 
+	opts ScanOptions
+
 	// wg sync the goroutine scanner.
 	wg sync.WaitGroup
 
@@ -44,17 +46,18 @@ type worker struct {
 	seenLinkMtx sync.Mutex
 }
 
-func newWorker(scanUrl string) (wrk *worker, err error) {
+func newWorker(opts ScanOptions) (wrk *worker, err error) {
 	wrk = &worker{
+		opts:     opts,
 		seenLink: map[string]int{},
-		linkq:    make(chan linkQueue, 1000),
+		linkq:    make(chan linkQueue, 10000),
 		errq:     make(chan error, 1),
 		result:   newResult(),
 	}
 
-	wrk.scanUrl, err = url.Parse(scanUrl)
+	wrk.scanUrl, err = url.Parse(opts.Url)
 	if err != nil {
-		return nil, fmt.Errorf(`invalid URL %q`, scanUrl)
+		return nil, fmt.Errorf(`invalid URL %q`, opts.Url)
 	}
 
 	wrk.scanUrl.Path = strings.TrimSuffix(wrk.scanUrl.Path, `/`)
@@ -107,11 +110,18 @@ func (wrk *worker) scan(linkq linkQueue) {
 		if statusCode >= http.StatusBadRequest {
 			wrk.markDead(linkq, statusCode)
 		}
+		if wrk.opts.IsVerbose {
+			fmt.Printf("scan: %s %d\n", linkq.url, statusCode)
+		}
 		return
 	}
 	wrk.seenLinkMtx.Lock()
 	wrk.seenLink[linkq.url] = http.StatusProcessing
 	wrk.seenLinkMtx.Unlock()
+
+	if wrk.opts.IsVerbose {
+		fmt.Printf("scan: %s %d\n", linkq.url, http.StatusProcessing)
+	}
 
 	var (
 		httpResp *http.Response

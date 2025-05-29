@@ -154,7 +154,10 @@ func TestDeadLinks_Scan(t *testing.T) {
 		err    error
 	)
 	for _, tcase := range listCase {
-		result, err = deadlinks.Scan(tcase.scanUrl)
+		var scanOpts = deadlinks.ScanOptions{
+			Url: tcase.scanUrl,
+		}
+		result, err = deadlinks.Scan(scanOpts)
 		if err != nil {
 			test.Assert(t, tcase.scanUrl+` error`,
 				tcase.expError, err.Error())
