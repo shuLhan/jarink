@@ -15,21 +15,54 @@ import (
 	"git.sr.ht/~shulhan/pakakeh.go/lib/test"
 )
 
-const testListenAddress = `127.0.0.1:11836`
+// The test run two web servers that serve content on "testdata/web/".
+// The first web server is the one that we want to scan.
+// The second web server is external web server, where HTML pages should not
+// be parsed.
+
+const testAddress = `127.0.0.1:11836`
+const testExternalAddress = `127.0.0.1:11900`
 
 func TestMain(m *testing.M) {
 	var httpDirWeb = http.Dir(`testdata/web`)
 	var fshandle = http.FileServer(httpDirWeb)
 
-	http.Handle(`/`, fshandle)
 	go func() {
-		var err = http.ListenAndServe(testListenAddress, nil)
+		var mux = http.NewServeMux()
+		mux.Handle(`/`, fshandle)
+		var testServer = &http.Server{
+			Addr:           testAddress,
+			Handler:        mux,
+			ReadTimeout:    10 * time.Second,
+			WriteTimeout:   10 * time.Second,
+			MaxHeaderBytes: 1 << 20,
+		}
+		var err = testServer.ListenAndServe()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+	go func() {
+		var mux = http.NewServeMux()
+		mux.Handle(`/`, fshandle)
+		var testServer = &http.Server{
+			Addr:           testExternalAddress,
+			Handler:        mux,
+			ReadTimeout:    10 * time.Second,
+			WriteTimeout:   10 * time.Second,
+			MaxHeaderBytes: 1 << 20,
+		}
+		var err = testServer.ListenAndServe()
 		if err != nil {
 			log.Fatal(err)
 		}
 	}()
 
-	var err = libnet.WaitAlive(`tcp`, testListenAddress, 5*time.Second)
+	var err = libnet.WaitAlive(`tcp`, testAddress, 5*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = libnet.WaitAlive(`tcp`, testExternalAddress, 5*time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,7 +71,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestDeadLinks_Scan(t *testing.T) {
-	var testUrl = `http://` + testListenAddress
+	var testUrl = `http://` + testAddress
 
 	type testCase struct {
 		exp      map[string][]deadlinks.Broken

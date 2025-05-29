@@ -137,6 +137,10 @@ func (wrk *worker) scan(linkq linkQueue) {
 	if linkq.kind == atom.Img {
 		return
 	}
+	if !strings.HasPrefix(linkq.url, wrk.baseUrl.String()) {
+		// Do not parse the page from external domain.
+		return
+	}
 	err = wrk.parseHTML(linkq.url, httpResp.Body)
 	if err != nil {
 		wrk.errq <- fmt.Errorf(`%s %s: %w`, logp, linkq.url, err)
