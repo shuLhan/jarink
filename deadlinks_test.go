@@ -94,6 +94,12 @@ func TestDeadLinks_Scan(t *testing.T) {
 			}, {
 				Link: testUrl + `/brokenPage`,
 				Code: http.StatusNotFound,
+			}, {
+				Link: `http://127.0.0.1:abc`,
+				Code: 700,
+			}, {
+				Link: `http:/127.0.0.1:11836`,
+				Code: http.StatusNotFound,
 			}},
 			testUrl + `/broken.html`: []deadlinks.Broken{{
 				Link: testUrl + `/brokenPage`,
@@ -118,6 +124,12 @@ func TestDeadLinks_Scan(t *testing.T) {
 				Code: http.StatusNotFound,
 			}, {
 				Link: testUrl + `/brokenPage`,
+				Code: http.StatusNotFound,
+			}, {
+				Link: `http://127.0.0.1:abc`,
+				Code: 700,
+			}, {
+				Link: `http:/127.0.0.1:11836`,
 				Code: http.StatusNotFound,
 			}},
 			testUrl + `/broken.html`: []deadlinks.Broken{{

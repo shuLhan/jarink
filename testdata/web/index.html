@@ -7,8 +7,13 @@ SPDX-License-Identifier: GPL-3.0-only
     <img src="/broken.png" />
     <a href="/brokenPage">Broken page</a>
     <img src="/gopher.png" />
+    <img width="200" src="" />
     <a href="/page2">Page 2</a>
     <a href="/broken.html">Broken HTML</a>
     <a href="http://127.0.0.1:11900">External URL</a>
+    <!-- Error when fetching with GET -->
+    <a href="http:/127.0.0.1:11836">Invalid external URL</a>
+    <!-- Error when parsing URL -->
+    <a href="http://127.0.0.1:abc">Invalid URL port</a>
   </body>
 </html>

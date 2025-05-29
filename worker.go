@@ -121,7 +121,11 @@ func (wrk *worker) scan(linkq linkQueue) {
 	)
 	httpResp, err = http.Get(linkq.url)
 	if err != nil {
-		wrk.errq <- err
+		if linkq.parentUrl == nil {
+			wrk.errq <- err
+		} else {
+			wrk.markDead(linkq, http.StatusNotFound)
+		}
 		return
 	}
 	defer httpResp.Body.Close()
@@ -196,7 +200,7 @@ func (wrk *worker) parseHTML(linkUrl string, body io.Reader) (err error) {
 	return nil
 }
 
-func (wrk *worker) processLink(rawParentUrl string, val string, kind atom.Atom) {
+func (wrk *worker) processLink(rawParentUrl, val string, kind atom.Atom) {
 	if len(val) == 0 {
 		return
 	}
