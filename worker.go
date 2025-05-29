@@ -98,8 +98,6 @@ func (wrk *worker) run() (result *Result, err error) {
 
 // scan fetch the HTML page or image to check if its valid.
 func (wrk *worker) scan(linkq linkQueue) {
-	var logp = `scan`
-
 	defer wrk.wg.Done()
 
 	wrk.seenLinkMtx.Lock()
@@ -145,11 +143,7 @@ func (wrk *worker) scan(linkq linkQueue) {
 		// Do not parse the page from external domain.
 		return
 	}
-	err = wrk.parseHTML(linkq.url, httpResp.Body)
-	if err != nil {
-		wrk.errq <- fmt.Errorf(`%s %s: %w`, logp, linkq.url, err)
-		return
-	}
+	wrk.parseHTML(linkq.url, httpResp.Body)
 }
 
 func (wrk *worker) markDead(linkq linkQueue, httpStatusCode int) {
@@ -166,14 +160,17 @@ func (wrk *worker) markDead(linkq linkQueue, httpStatusCode int) {
 	wrk.seenLinkMtx.Unlock()
 }
 
-func (wrk *worker) parseHTML(linkUrl string, body io.Reader) (err error) {
-	var logp = `parseHTML`
-
+func (wrk *worker) parseHTML(linkUrl string, body io.Reader) {
 	var doc *html.Node
-	doc, err = html.Parse(body)
-	if err != nil {
-		return fmt.Errorf(`%s: %w`, logp, err)
-	}
+
+	doc, _ = html.Parse(body)
+
+	// After we check the code and test for [html.Parse] there are
+	// no case actual cases where HTML content will return an error.
+	// The only possible error is when reading from body (io.Reader), and
+	// that is also almost impossible.
+	//
+	// [html.Parse]: https://go.googlesource.com/net/+/refs/tags/v0.40.0/html/parse.go#2347
 
 	var node *html.Node
 	for node = range doc.Descendants() {
@@ -197,7 +194,6 @@ func (wrk *worker) parseHTML(linkUrl string, body io.Reader) (err error) {
 			}
 		}
 	}
-	return nil
 }
 
 func (wrk *worker) processLink(rawParentUrl, val string, kind atom.Atom) {
