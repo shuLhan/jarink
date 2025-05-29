@@ -65,6 +65,10 @@ func TestDeadLinks_Scan(t *testing.T) {
 				Link: `https://kilabit.info/brokenPage`,
 				Code: http.StatusNotFound,
 			}},
+			testUrl + `/broken.html`: []deadlinks.Broken{{
+				Link: testUrl + `/brokenPage`,
+				Code: http.StatusNotFound,
+			}},
 			testUrl + `/page2`: []deadlinks.Broken{{
 				Link: testUrl + `/broken.png`,
 				Code: http.StatusNotFound,
@@ -87,6 +91,10 @@ func TestDeadLinks_Scan(t *testing.T) {
 				Code: http.StatusNotFound,
 			}, {
 				Link: `https://kilabit.info/brokenPage`,
+				Code: http.StatusNotFound,
+			}},
+			testUrl + `/broken.html`: []deadlinks.Broken{{
+				Link: testUrl + `/brokenPage`,
 				Code: http.StatusNotFound,
 			}},
 			testUrl + `/page2`: []deadlinks.Broken{{
@@ -113,6 +121,8 @@ func TestDeadLinks_Scan(t *testing.T) {
 				tcase.expError, err.Error())
 			continue
 		}
+		//got, _ := json.MarshalIndent(result.PageLinks, ``, `  `)
+		//t.Logf(`got=%s`, got)
 		test.Assert(t, tcase.scanUrl, tcase.exp, result.PageLinks)
 	}
 }
