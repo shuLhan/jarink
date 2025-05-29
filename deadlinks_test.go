@@ -24,6 +24,7 @@ const testAddress = `127.0.0.1:11836`
 const testExternalAddress = `127.0.0.1:11900`
 
 func TestMain(m *testing.M) {
+	log.SetFlags(0)
 	var httpDirWeb = http.Dir(`testdata/web`)
 	var fshandle = http.FileServer(httpDirWeb)
 
