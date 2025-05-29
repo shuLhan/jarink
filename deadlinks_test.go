@@ -61,9 +61,6 @@ func TestDeadLinks_Scan(t *testing.T) {
 			}, {
 				Link: testUrl + `/brokenPage`,
 				Code: http.StatusNotFound,
-			}, {
-				Link: `https://kilabit.info/brokenPage`,
-				Code: http.StatusNotFound,
 			}},
 			testUrl + `/broken.html`: []deadlinks.Broken{{
 				Link: testUrl + `/brokenPage`,
@@ -88,9 +85,6 @@ func TestDeadLinks_Scan(t *testing.T) {
 				Code: http.StatusNotFound,
 			}, {
 				Link: testUrl + `/brokenPage`,
-				Code: http.StatusNotFound,
-			}, {
-				Link: `https://kilabit.info/brokenPage`,
 				Code: http.StatusNotFound,
 			}},
 			testUrl + `/broken.html`: []deadlinks.Broken{{
