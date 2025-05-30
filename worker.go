@@ -129,7 +129,11 @@ func (wrk *worker) scan(linkq linkQueue) {
 		httpResp *http.Response
 		err      error
 	)
-	httpResp, err = http.Get(linkq.url)
+	if linkq.kind == atom.Img {
+		httpResp, err = http.Head(linkq.url)
+	} else {
+		httpResp, err = http.Get(linkq.url)
+	}
 	if err != nil {
 		if linkq.parentUrl == nil {
 			wrk.errq <- err
