@@ -197,24 +197,27 @@ func (wrk *worker) markDead(linkq linkQueue) {
 // scan fetch the HTML page or image to check if its valid.
 func (wrk *worker) scan(linkq linkQueue) {
 	defer func() {
-		if wrk.opts.IsVerbose {
-			fmt.Printf("  done: %d %s\n", linkq.status, linkq.url)
+		if wrk.opts.IsVerbose && linkq.errScan != nil {
+			fmt.Printf("error: %d %s error=%v\n", linkq.status,
+				linkq.url, linkq.errScan)
 		}
 		wrk.wg.Done()
 	}()
-
-	if wrk.opts.IsVerbose {
-		fmt.Printf("scan: %d %s\n", linkq.status, linkq.url)
-	}
 
 	var (
 		resultq  = map[string]linkQueue{}
 		httpResp *http.Response
 		err      error
 	)
-	if linkq.kind == atom.Img {
+	if linkq.kind == atom.Img || linkq.isExternal {
+		if wrk.opts.IsVerbose {
+			fmt.Printf("scan: HEAD %s\n", linkq.url)
+		}
 		httpResp, err = http.Head(linkq.url)
 	} else {
+		if wrk.opts.IsVerbose {
+			fmt.Printf("scan: GET %s\n", linkq.url)
+		}
 		httpResp, err = http.Get(linkq.url)
 	}
 	if err != nil {
@@ -233,13 +236,7 @@ func (wrk *worker) scan(linkq linkQueue) {
 		go wrk.pushResult(resultq)
 		return
 	}
-	if linkq.kind == atom.Img {
-		go wrk.pushResult(resultq)
-		return
-	}
-	if !strings.HasPrefix(linkq.url, wrk.baseUrl.String()) {
-		// Do not parse the HTML page from external domain, only need
-		// its HTTP status code.
+	if linkq.kind == atom.Img || linkq.isExternal {
 		go wrk.pushResult(resultq)
 		return
 	}
@@ -291,11 +288,18 @@ func (wrk *worker) scan(linkq linkQueue) {
 		if link == "" {
 			continue
 		}
-		resultq[link] = linkQueue{
-			parentUrl: scanUrl,
-			url:       link,
-			kind:      node.DataAtom,
-			status:    status,
+		_, seen := resultq[link]
+		if !seen {
+			var childLink = linkQueue{
+				parentUrl: scanUrl,
+				url:       link,
+				kind:      node.DataAtom,
+				status:    status,
+			}
+			if !strings.HasPrefix(childLink.url, wrk.baseUrl.String()) {
+				childLink.isExternal = true
+			}
+			resultq[link] = childLink
 		}
 	}
 	go wrk.pushResult(resultq)
