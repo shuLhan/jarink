@@ -115,9 +115,16 @@ func (wrk *worker) run() (result *Result, err error) {
 			//	"http://example.tld/image.png": {status=0}
 			//	"http://bad:domain/image.png": {status=700}
 
+			var newList []linkQueue
 			for _, linkq := range resultq {
 				if linkq.status >= http.StatusBadRequest {
 					wrk.markDead(linkq)
+					continue
+				}
+				if linkq.status != 0 {
+					// linkq is the result of scan with
+					// non error status.
+					wrk.seenLink[linkq.url] = linkq.status
 					continue
 				}
 
@@ -138,41 +145,41 @@ func (wrk *worker) run() (result *Result, err error) {
 					// not an error.
 					continue
 				}
-				if linkq.status != 0 {
-					// linkq is the result of scan with
-					// non error status.
-					wrk.seenLink[linkq.url] = linkq.status
+				if seenStatus == http.StatusProcessing {
+					// The link being processed by other
+					// goroutine.
+					linkq.status = seenStatus
+					newList = append(newList, linkq)
 					continue
 				}
-
-				// The link being processed by other
-				// goroutine.
-				listWaitStatus = append(listWaitStatus, linkq)
+				log.Fatalf("link=%s status=%d", linkq.url, linkq.status)
 			}
+			for _, linkq := range listWaitStatus {
+				seenStatus := wrk.seenLink[linkq.url]
+				if seenStatus >= http.StatusBadRequest {
+					linkq.status = seenStatus
+					wrk.markDead(linkq)
+					continue
+				}
+				if seenStatus >= http.StatusOK {
+					continue
+				}
+				if seenStatus == http.StatusProcessing {
+					// Scanning still in progress.
+					newList = append(newList, linkq)
+					continue
+				}
+			}
+			listWaitStatus = newList
 
 		case <-tick.C:
 			wrk.wg.Wait()
 			if len(wrk.resultq) != 0 {
 				continue
 			}
-			var newList []linkQueue
-			for _, linkq := range listWaitStatus {
-				seenStatus := wrk.seenLink[linkq.url]
-				if seenStatus == http.StatusProcessing {
-					// Scanning still in progress.
-					newList = append(newList, linkq)
-					continue
-				}
-				if seenStatus >= http.StatusBadRequest {
-					linkq.status = seenStatus
-					wrk.markDead(linkq)
-					continue
-				}
-			}
-			if len(newList) != 0 {
-				// There are link that still waiting for
+			if len(listWaitStatus) != 0 {
+				// There are links that still waiting for
 				// scanning to be completed.
-				listWaitStatus = newList
 				continue
 			}
 			isScanning = false
@@ -191,6 +198,7 @@ func (wrk *worker) markDead(linkq linkQueue) {
 	}
 	listBroken = append(listBroken, brokenLink)
 	wrk.result.PageLinks[parentUrl] = listBroken
+
 	wrk.seenLink[linkq.url] = linkq.status
 }
 
