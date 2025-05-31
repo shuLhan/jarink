@@ -97,8 +97,9 @@ func TestDeadLinks_Scan(t *testing.T) {
 					Link: testUrl + `/brokenPage`,
 					Code: http.StatusNotFound,
 				}, {
-					Link: `http://127.0.0.1:abc`,
-					Code: deadlinks.StatusBadLink,
+					Link:  `http://127.0.0.1:abc`,
+					Error: `parse "http://127.0.0.1:abc": invalid port ":abc" after host`,
+					Code:  deadlinks.StatusBadLink,
 				}, {
 					Link:  `http:/127.0.0.1:11836`,
 					Error: `Head "http:/127.0.0.1:11836": http: no Host in request URL`,
@@ -135,8 +136,9 @@ func TestDeadLinks_Scan(t *testing.T) {
 					Link: testUrl + `/brokenPage`,
 					Code: http.StatusNotFound,
 				}, {
-					Link: `http://127.0.0.1:abc`,
-					Code: deadlinks.StatusBadLink,
+					Link:  `http://127.0.0.1:abc`,
+					Error: `parse "http://127.0.0.1:abc": invalid port ":abc" after host`,
+					Code:  deadlinks.StatusBadLink,
 				}, {
 					Link:  `http:/127.0.0.1:11836`,
 					Error: `Head "http:/127.0.0.1:11836": http: no Host in request URL`,

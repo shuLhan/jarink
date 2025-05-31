@@ -270,19 +270,17 @@ func (wrk *worker) scan(linkq linkQueue) {
 	}
 
 	var node *html.Node
-	var link string
-	var status int
 	for node = range doc.Descendants() {
 		if node.Type != html.ElementNode {
 			continue
 		}
-		link = ""
+		var nodeLink *linkQueue
 		if node.DataAtom == atom.A {
 			for _, attr := range node.Attr {
 				if attr.Key != `href` {
 					continue
 				}
-				link, status = wrk.processLink(scanUrl, attr.Val, atom.A)
+				nodeLink = wrk.processLink(scanUrl, attr.Val, atom.A)
 				break
 			}
 		} else if node.DataAtom == atom.Img {
@@ -290,55 +288,58 @@ func (wrk *worker) scan(linkq linkQueue) {
 				if attr.Key != `src` {
 					continue
 				}
-				link, status = wrk.processLink(scanUrl, attr.Val, atom.Img)
+				nodeLink = wrk.processLink(scanUrl, attr.Val, atom.Img)
 				break
 			}
 		} else {
 			continue
 		}
-		if link == "" {
+		if nodeLink == nil {
 			continue
 		}
-		_, seen := resultq[link]
+		_, seen := resultq[nodeLink.url]
 		if !seen {
-			var childLink = linkQueue{
-				parentUrl: scanUrl,
-				url:       link,
-				kind:      node.DataAtom,
-				status:    status,
+			if !strings.HasPrefix(nodeLink.url, wrk.baseUrl.String()) {
+				nodeLink.isExternal = true
 			}
-			if !strings.HasPrefix(childLink.url, wrk.baseUrl.String()) {
-				childLink.isExternal = true
-			}
-			resultq[link] = childLink
+			resultq[nodeLink.url] = *nodeLink
 		}
 	}
 	go wrk.pushResult(resultq)
 }
 
 func (wrk *worker) processLink(parentUrl *url.URL, val string, kind atom.Atom) (
-	link string, status int,
+	linkq *linkQueue,
 ) {
 	if len(val) == 0 {
-		return "", 0
+		return nil
 	}
 
 	var newUrl *url.URL
 	var err error
 	newUrl, err = url.Parse(val)
 	if err != nil {
-		return val, StatusBadLink
+		return &linkQueue{
+			parentUrl: parentUrl,
+			errScan:   err,
+			url:       val,
+			kind:      kind,
+			status:    StatusBadLink,
+		}
 	}
 	newUrl.Fragment = ""
 	newUrl.RawFragment = ""
 
 	if kind == atom.A && val[0] == '#' {
 		// Ignore link to ID, like `href="#element_id"`.
-		return "", 0
+		return nil
 	}
 	if strings.HasPrefix(val, `http`) {
-		link = strings.TrimSuffix(newUrl.String(), `/`)
-		return link, 0
+		return &linkQueue{
+			parentUrl: parentUrl,
+			url:       strings.TrimSuffix(newUrl.String(), `/`),
+			kind:      kind,
+		}
 	}
 	if val[0] == '/' {
 		// val is absolute to parent URL.
@@ -347,8 +348,12 @@ func (wrk *worker) processLink(parentUrl *url.URL, val string, kind atom.Atom) (
 		// val is relative to parent URL.
 		newUrl = parentUrl.JoinPath(`/`, newUrl.Path)
 	}
-	link = strings.TrimSuffix(newUrl.String(), `/`)
-	return link, 0
+	linkq = &linkQueue{
+		parentUrl: parentUrl,
+		url:       strings.TrimSuffix(newUrl.String(), `/`),
+		kind:      kind,
+	}
+	return linkq
 }
 
 func (wrk *worker) pushResult(resultq map[string]linkQueue) {
