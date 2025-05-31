@@ -7,6 +7,8 @@ import (
 	"fmt"
 )
 
+const Version = `0.1.0`
+
 // StatusBadLink status for link that is not parseable by [url.Parse] or not
 // reachable during GET or HEAD, either timeout or IP or domain not exist.
 const StatusBadLink = 700

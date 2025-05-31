@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -43,15 +44,12 @@ func main() {
 			log.Fatal(err.Error())
 		}
 
-		var page string
-		var listBroken []deadlinks.Broken
-		for page, listBroken = range result.PageLinks {
-			fmt.Printf("Page: %s\n", page)
-			for _, broken := range listBroken {
-				fmt.Printf("\tDead: %s (%d)\n", broken.Link,
-					broken.Code)
-			}
+		var resultJson []byte
+		resultJson, err = json.MarshalIndent(result.PageLinks, ``, `  `)
+		if err != nil {
+			log.Fatal(err.Error())
 		}
+		fmt.Printf("%s\n", resultJson)
 		return
 	}
 
@@ -71,11 +69,11 @@ the image src attribute ("<img src=...").
 
 == Usage
 
-scan URL [OPTIONS]
+[OPTIONS] scan URL
 
 	Start scanning for deadlinks on the web server pointed by URL.
 	Once finished it will print the page and list of dead links inside
-	that page.
+	that page in JSON format.
 	This command accept the following options,
 
 	-verbose : print the page that being scanned.
@@ -83,10 +81,29 @@ scan URL [OPTIONS]
 	Example,
 
 	$ deadlinks scan https://kilabit.info
-	Page: https://kilabit.info/some/page
-		Dead: https://kilabit.info/some/page/image.png (404)
-		Dead: https://external.com/link (500)
-	Page: https://kilabit.info/another/page
-		Dead: https://kilabit.info/another/page/image.png (404)
-		Dead: https://external.org/link (500)`)
+	{
+	  "https://kilabit.info/some/page": [
+	    {
+	      "Link": "https://kilabit.info/some/page/image.png",
+	      "Code": 404
+	    },
+	    {
+	      "Link": "https://external.com/link",
+	      "Code": 500
+	    }
+	  ],
+	  "https://kilabit.info/another/page": [
+	    {
+	      "Link": "https://kilabit.info/another/page/image.png",
+	      "Code": 404
+	    },
+	    {
+	      "Link": "https://external.org/link",
+	      "Code": 500
+	    }
+	  ]
+	}
+
+--
+deadlinks v` + deadlinks.Version)
 }
