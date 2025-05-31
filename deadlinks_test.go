@@ -100,8 +100,9 @@ func TestDeadLinks_Scan(t *testing.T) {
 					Link: `http://127.0.0.1:abc`,
 					Code: deadlinks.StatusBadLink,
 				}, {
-					Link: `http:/127.0.0.1:11836`,
-					Code: deadlinks.StatusBadLink,
+					Link:  `http:/127.0.0.1:11836`,
+					Error: `Head "http:/127.0.0.1:11836": http: no Host in request URL`,
+					Code:  deadlinks.StatusBadLink,
 				},
 			},
 			testUrl + `/broken.html`: []deadlinks.Broken{
@@ -137,8 +138,9 @@ func TestDeadLinks_Scan(t *testing.T) {
 					Link: `http://127.0.0.1:abc`,
 					Code: deadlinks.StatusBadLink,
 				}, {
-					Link: `http:/127.0.0.1:11836`,
-					Code: deadlinks.StatusBadLink,
+					Link:  `http:/127.0.0.1:11836`,
+					Error: `Head "http:/127.0.0.1:11836": http: no Host in request URL`,
+					Code:  deadlinks.StatusBadLink,
 				},
 			},
 			testUrl + `/broken.html`: []deadlinks.Broken{

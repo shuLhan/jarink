@@ -196,6 +196,9 @@ func (wrk *worker) markDead(linkq linkQueue) {
 		Link: linkq.url,
 		Code: linkq.status,
 	}
+	if linkq.errScan != nil {
+		brokenLink.Error = linkq.errScan.Error()
+	}
 	listBroken = append(listBroken, brokenLink)
 	wrk.result.PageLinks[parentUrl] = listBroken
 

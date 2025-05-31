@@ -89,6 +89,7 @@ the image src attribute ("<img src=...").
 	    },
 	    {
 	      "Link": "https://external.com/link",
+	      "Error": "Internal server error",
 	      "Code": 500
 	    }
 	  ],
@@ -99,6 +100,7 @@ the image src attribute ("<img src=...").
 	    },
 	    {
 	      "Link": "https://external.org/link",
+	      "Error": "Internal server error",
 	      "Code": 500
 	    }
 	  ]

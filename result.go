@@ -10,8 +10,9 @@ import (
 
 // Broken store the link with its HTTP status.
 type Broken struct {
-	Link string
-	Code int
+	Link  string
+	Error string `json:"omitempty"`
+	Code  int
 }
 
 // Result store the result of Scan.
