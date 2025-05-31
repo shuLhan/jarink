@@ -7,6 +7,10 @@ import (
 	"fmt"
 )
 
+// StatusBadLink status for link that is not parseable by [url.Parse] or not
+// reachable during GET or HEAD, either timeout or IP or domain not exist.
+const StatusBadLink = 700
+
 // Scan the baseUrl for dead links.
 func Scan(opts ScanOptions) (result *Result, err error) {
 	var logp = `Scan`

@@ -89,64 +89,76 @@ func TestDeadLinks_Scan(t *testing.T) {
 	}, {
 		scanUrl: testUrl,
 		exp: map[string][]deadlinks.Broken{
-			testUrl: []deadlinks.Broken{{
-				Link: testUrl + `/broken.png`,
-				Code: http.StatusNotFound,
-			}, {
-				Link: testUrl + `/brokenPage`,
-				Code: http.StatusNotFound,
-			}, {
-				Link: `http://127.0.0.1:abc`,
-				Code: 700,
-			}, {
-				Link: `http:/127.0.0.1:11836`,
-				Code: http.StatusNotFound,
-			}},
-			testUrl + `/broken.html`: []deadlinks.Broken{{
-				Link: testUrl + `/brokenPage`,
-				Code: http.StatusNotFound,
-			}},
-			testUrl + `/page2`: []deadlinks.Broken{{
-				Link: testUrl + `/broken.png`,
-				Code: http.StatusNotFound,
-			}, {
-				Link: testUrl + `/page2/broken/relative`,
-				Code: http.StatusNotFound,
-			}, {
-				Link: testUrl + `/page2/broken2.png`,
-				Code: http.StatusNotFound,
-			}},
+			testUrl: []deadlinks.Broken{
+				{
+					Link: testUrl + `/broken.png`,
+					Code: http.StatusNotFound,
+				}, {
+					Link: testUrl + `/brokenPage`,
+					Code: http.StatusNotFound,
+				}, {
+					Link: `http://127.0.0.1:abc`,
+					Code: deadlinks.StatusBadLink,
+				}, {
+					Link: `http:/127.0.0.1:11836`,
+					Code: deadlinks.StatusBadLink,
+				},
+			},
+			testUrl + `/broken.html`: []deadlinks.Broken{
+				{
+					Link: testUrl + `/brokenPage`,
+					Code: http.StatusNotFound,
+				},
+			},
+			testUrl + `/page2`: []deadlinks.Broken{
+				{
+					Link: testUrl + `/broken.png`,
+					Code: http.StatusNotFound,
+				}, {
+					Link: testUrl + `/page2/broken/relative`,
+					Code: http.StatusNotFound,
+				}, {
+					Link: testUrl + `/page2/broken2.png`,
+					Code: http.StatusNotFound,
+				},
+			},
 		},
 	}, {
 		scanUrl: testUrl + `/page2`,
 		exp: map[string][]deadlinks.Broken{
-			testUrl: []deadlinks.Broken{{
-				Link: testUrl + `/broken.png`,
-				Code: http.StatusNotFound,
-			}, {
-				Link: testUrl + `/brokenPage`,
-				Code: http.StatusNotFound,
-			}, {
-				Link: `http://127.0.0.1:abc`,
-				Code: 700,
-			}, {
-				Link: `http:/127.0.0.1:11836`,
-				Code: http.StatusNotFound,
-			}},
-			testUrl + `/broken.html`: []deadlinks.Broken{{
-				Link: testUrl + `/brokenPage`,
-				Code: http.StatusNotFound,
-			}},
-			testUrl + `/page2`: []deadlinks.Broken{{
-				Link: testUrl + `/broken.png`,
-				Code: http.StatusNotFound,
-			}, {
-				Link: testUrl + `/page2/broken/relative`,
-				Code: http.StatusNotFound,
-			}, {
-				Link: testUrl + `/page2/broken2.png`,
-				Code: http.StatusNotFound,
-			}},
+			testUrl: []deadlinks.Broken{
+				{
+					Link: testUrl + `/broken.png`,
+					Code: http.StatusNotFound,
+				}, {
+					Link: testUrl + `/brokenPage`,
+					Code: http.StatusNotFound,
+				}, {
+					Link: `http://127.0.0.1:abc`,
+					Code: deadlinks.StatusBadLink,
+				}, {
+					Link: `http:/127.0.0.1:11836`,
+					Code: deadlinks.StatusBadLink,
+				},
+			},
+			testUrl + `/broken.html`: []deadlinks.Broken{
+				{
+					Link: testUrl + `/brokenPage`,
+					Code: http.StatusNotFound,
+				},
+			},
+			testUrl + `/page2`: []deadlinks.Broken{
+				{
+					Link: testUrl + `/broken.png`,
+					Code: http.StatusNotFound,
+				}, {
+					Link: testUrl + `/page2/broken/relative`,
+					Code: http.StatusNotFound,
+				}, {
+					Link: testUrl + `/page2/broken2.png`,
+					Code: http.StatusNotFound,
+				},
+			},
 		},
 	}}
 
@@ -155,6 +167,7 @@ func TestDeadLinks_Scan(t *testing.T) {
 		err    error
 	)
 	for _, tcase := range listCase {
+		t.Logf(`--- Scan: %s`, tcase.scanUrl)
 		var scanOpts = deadlinks.ScanOptions{
 			Url: tcase.scanUrl,
 		}

@@ -5,29 +5,27 @@ package deadlinks
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
 
 type worker struct {
-	// seenLink store the page URL that has been scanned and its HTTP status
-	// code.
+	// seenLink store the URL being or has been scanned and its HTTP
+	// status code.
 	seenLink map[string]int
 
-	// linkq contains queue of page URL to be scanned.
-	linkq chan linkQueue
+	// resultq channel that collect result from scanning.
+	resultq chan map[string]linkQueue
 
-	// errq contains error from scanning a page URL.
-	errq chan error
-
-	// result contains map of page URL and its list of broken link.
+	// result contains the final result after all of the pages has been
+	// scanned.
 	result *Result
 
 	// The base URL that will be joined to relative or absolute
@@ -41,17 +39,13 @@ type worker struct {
 
 	// wg sync the goroutine scanner.
 	wg sync.WaitGroup
-
-	// seenLinkMtx guard the seenLink field from concurrent read/write.
-	seenLinkMtx sync.Mutex
 }
 
 func newWorker(opts ScanOptions) (wrk *worker, err error) {
 	wrk = &worker{
 		opts:     opts,
 		seenLink: map[string]int{},
-		linkq:    make(chan linkQueue, 10000),
-		errq:     make(chan error, 1),
+		resultq:  make(chan map[string]linkQueue, 100),
 		result:   newResult(),
 	}
 
@@ -69,63 +63,151 @@ func newWorker(opts ScanOptions) (wrk *worker, err error) {
 		Host:   wrk.scanUrl.Host,
 	}
 
-	wrk.linkq <- linkQueue{
-		parentUrl: nil,
-		url:       wrk.scanUrl.String(),
-	}
 	return wrk, nil
 }
 
 func (wrk *worker) run() (result *Result, err error) {
-	var ever bool = true
-	for ever {
+	// Scan the first URL to make sure that the server is reachable.
+	var firstLinkq = linkQueue{
+		parentUrl: nil,
+		url:       wrk.scanUrl.String(),
+		status:    http.StatusProcessing,
+	}
+	wrk.seenLink[firstLinkq.url] = http.StatusProcessing
+
+	wrk.wg.Add(1)
+	go wrk.scan(firstLinkq)
+	wrk.wg.Wait()
+
+	var resultq = <-wrk.resultq
+	for _, linkq := range resultq {
+		if linkq.url == firstLinkq.url {
+			if linkq.errScan != nil {
+				return nil, linkq.errScan
+			}
+			wrk.seenLink[linkq.url] = linkq.status
+			continue
+		}
+		if linkq.status >= http.StatusBadRequest {
+			wrk.markDead(linkq)
+			continue
+		}
+
+		wrk.seenLink[linkq.url] = http.StatusProcessing
+		wrk.wg.Add(1)
+		go wrk.scan(linkq)
+	}
+
+	var listWaitStatus []linkQueue
+	var isScanning = true
+	for isScanning {
 		select {
-		case linkq := <-wrk.linkq:
-			wrk.wg.Add(1)
-			go wrk.scan(linkq)
+		case resultq := <-wrk.resultq:
+
+			// The resultq contains the original URL being scanned
+			// and its child links.
+			// For example, scanning "http://example.tld" result
+			// in
+			//
+			//	"http://example.tld": {status=200}
+			//	"http://example.tld/page": {status=0}
+			//	"http://example.tld/image.png": {status=0}
+			//	"http://bad:domain/image.png": {status=700}
+
+			for _, linkq := range resultq {
+				if linkq.status >= http.StatusBadRequest {
+					wrk.markDead(linkq)
+					continue
+				}
+
+				seenStatus, seen := wrk.seenLink[linkq.url]
+				if !seen {
+					wrk.seenLink[linkq.url] = http.StatusProcessing
+					wrk.wg.Add(1)
+					go wrk.scan(linkq)
+					continue
+				}
+				if seenStatus >= http.StatusBadRequest {
+					linkq.status = seenStatus
+					wrk.markDead(linkq)
+					continue
+				}
+				if seenStatus >= http.StatusOK {
+					// The link has been processed and its
+					// not an error.
+					continue
+				}
+				if linkq.status != 0 {
+					// linkq is the result of scan with
+					// non error status.
+					wrk.seenLink[linkq.url] = linkq.status
+					continue
+				}
+
+				// The link being processed by other
+				// goroutine.
+				listWaitStatus = append(listWaitStatus, linkq)
+			}
 
 		default:
 			wrk.wg.Wait()
-
-			select {
-			case err = <-wrk.errq:
-				return nil, err
-			default:
-				if len(wrk.linkq) == 0 {
-					ever = false
+			if len(wrk.resultq) != 0 {
+				continue
+			}
+			var newList []linkQueue
+			for _, linkq := range listWaitStatus {
+				seenStatus := wrk.seenLink[linkq.url]
+				if seenStatus == http.StatusProcessing {
+					// Scanning still in progress.
+					newList = append(newList, linkq)
+					continue
+				}
+				if seenStatus >= http.StatusBadRequest {
+					linkq.status = seenStatus
+					wrk.markDead(linkq)
+					continue
 				}
 			}
+			if len(newList) != 0 {
+				// There are link that still waiting for
+				// scanning to be completed.
+				listWaitStatus = newList
+				continue
+			}
+			isScanning = false
 		}
 	}
 	wrk.result.sort()
 	return wrk.result, nil
 }
 
+func (wrk *worker) markDead(linkq linkQueue) {
+	var parentUrl = linkq.parentUrl.String()
+	var listBroken = wrk.result.PageLinks[parentUrl]
+	var brokenLink = Broken{
+		Link: linkq.url,
+		Code: linkq.status,
+	}
+	listBroken = append(listBroken, brokenLink)
+	wrk.result.PageLinks[parentUrl] = listBroken
+	wrk.seenLink[linkq.url] = linkq.status
+}
+
 // scan fetch the HTML page or image to check if its valid.
 func (wrk *worker) scan(linkq linkQueue) {
-	defer wrk.wg.Done()
-
-	wrk.seenLinkMtx.Lock()
-	statusCode, seen := wrk.seenLink[linkq.url]
-	wrk.seenLinkMtx.Unlock()
-	if seen {
-		if statusCode >= http.StatusBadRequest {
-			wrk.markDead(linkq, statusCode)
-		}
+	defer func() {
 		if wrk.opts.IsVerbose {
-			fmt.Printf("scan: %s %d\n", linkq.url, statusCode)
+			fmt.Printf("  done: %d %s\n", linkq.status, linkq.url)
 		}
-		return
-	}
-	wrk.seenLinkMtx.Lock()
-	wrk.seenLink[linkq.url] = http.StatusProcessing
-	wrk.seenLinkMtx.Unlock()
+		wrk.wg.Done()
+	}()
 
 	if wrk.opts.IsVerbose {
-		fmt.Printf("scan: %s %d\n", linkq.url, http.StatusProcessing)
+		fmt.Printf("scan: %d %s\n", linkq.status, linkq.url)
 	}
 
 	var (
+		resultq  = map[string]linkQueue{}
 		httpResp *http.Response
 		err      error
 	)
@@ -135,51 +217,34 @@ func (wrk *worker) scan(linkq linkQueue) {
 		httpResp, err = http.Get(linkq.url)
 	}
 	if err != nil {
-		if linkq.parentUrl == nil {
-			wrk.errq <- err
-		} else {
-			wrk.markDead(linkq, http.StatusNotFound)
-		}
+		linkq.status = StatusBadLink
+		linkq.errScan = err
+		resultq[linkq.url] = linkq
+		go wrk.pushResult(resultq)
 		return
 	}
 	defer httpResp.Body.Close()
 
-	if httpResp.StatusCode != http.StatusOK {
-		wrk.markDead(linkq, httpResp.StatusCode)
+	linkq.status = httpResp.StatusCode
+	resultq[linkq.url] = linkq
+
+	if httpResp.StatusCode >= http.StatusBadRequest {
+		go wrk.pushResult(resultq)
 		return
 	}
-	wrk.seenLinkMtx.Lock()
-	wrk.seenLink[linkq.url] = http.StatusOK
-	wrk.seenLinkMtx.Unlock()
-
 	if linkq.kind == atom.Img {
+		go wrk.pushResult(resultq)
 		return
 	}
 	if !strings.HasPrefix(linkq.url, wrk.baseUrl.String()) {
-		// Do not parse the page from external domain.
+		// Do not parse the HTML page from external domain, only need
+		// its HTTP status code.
+		go wrk.pushResult(resultq)
 		return
 	}
-	wrk.parseHTML(linkq.url, httpResp.Body)
-}
 
-func (wrk *worker) markDead(linkq linkQueue, httpStatusCode int) {
-	var parentUrl = linkq.parentUrl.String()
-
-	wrk.seenLinkMtx.Lock()
-	var listBroken = wrk.result.PageLinks[parentUrl]
-	listBroken = append(listBroken, Broken{
-		Link: linkq.url,
-		Code: httpStatusCode,
-	})
-	wrk.result.PageLinks[parentUrl] = listBroken
-	wrk.seenLink[linkq.url] = httpStatusCode
-	wrk.seenLinkMtx.Unlock()
-}
-
-func (wrk *worker) parseHTML(linkUrl string, body io.Reader) {
 	var doc *html.Node
-
-	doc, _ = html.Parse(body)
+	doc, _ = html.Parse(httpResp.Body)
 
 	// After we check the code and test for [html.Parse] there are
 	// no case actual cases where HTML content will return an error.
@@ -188,90 +253,96 @@ func (wrk *worker) parseHTML(linkUrl string, body io.Reader) {
 	//
 	// [html.Parse]: https://go.googlesource.com/net/+/refs/tags/v0.40.0/html/parse.go#2347
 
+	var scanUrl *url.URL
+
+	scanUrl, err = url.Parse(linkq.url)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	var node *html.Node
+	var link string
+	var status int
 	for node = range doc.Descendants() {
 		if node.Type != html.ElementNode {
 			continue
 		}
+		link = ""
 		if node.DataAtom == atom.A {
 			for _, attr := range node.Attr {
 				if attr.Key != `href` {
 					continue
 				}
-				wrk.processLink(linkUrl, attr.Val, atom.A)
+				link, status = wrk.processLink(scanUrl, attr.Val, atom.A)
+				break
 			}
-		}
-		if node.DataAtom == atom.Img {
+		} else if node.DataAtom == atom.Img {
 			for _, attr := range node.Attr {
 				if attr.Key != `src` {
 					continue
 				}
-				wrk.processLink(linkUrl, attr.Val, atom.Img)
+				link, status = wrk.processLink(scanUrl, attr.Val, atom.Img)
+				break
 			}
+		} else {
+			continue
+		}
+		if link == "" {
+			continue
+		}
+		resultq[link] = linkQueue{
+			parentUrl: scanUrl,
+			url:       link,
+			kind:      node.DataAtom,
+			status:    status,
 		}
 	}
+	go wrk.pushResult(resultq)
 }
 
-func (wrk *worker) processLink(rawParentUrl, val string, kind atom.Atom) {
+func (wrk *worker) processLink(parentUrl *url.URL, val string, kind atom.Atom) (
+	link string, status int,
+) {
 	if len(val) == 0 {
-		return
-	}
-
-	var parentUrl *url.URL
-	var err error
-
-	parentUrl, err = url.Parse(rawParentUrl)
-	if err != nil {
-		log.Fatal(err)
+		return "", 0
 	}
 
 	var newUrl *url.URL
+	var err error
 	newUrl, err = url.Parse(val)
 	if err != nil {
-		var linkq = linkQueue{
-			parentUrl: parentUrl,
-			url:       val,
-			kind:      kind,
-		}
-		wrk.markDead(linkq, 700)
-		return
+		return val, StatusBadLink
 	}
 	newUrl.Fragment = ""
 	newUrl.RawFragment = ""
 
-	var newUrlStr = strings.TrimSuffix(newUrl.String(), `/`)
-
 	if kind == atom.A && val[0] == '#' {
 		// Ignore link to ID, like `href="#element_id"`.
-		return
-	}
-
-	// val is absolute to parent URL.
-	if val[0] == '/' {
-		// Link to the same domain will queued for scanning.
-		newUrl = wrk.baseUrl.JoinPath(newUrl.Path)
-		newUrlStr = strings.TrimSuffix(newUrl.String(), `/`)
-		wrk.linkq <- linkQueue{
-			parentUrl: parentUrl,
-			url:       newUrlStr,
-			kind:      kind,
-		}
-		return
+		return "", 0
 	}
 	if strings.HasPrefix(val, `http`) {
-		wrk.linkq <- linkQueue{
-			parentUrl: parentUrl,
-			url:       newUrlStr,
-			kind:      kind,
-		}
-		return
+		link = strings.TrimSuffix(newUrl.String(), `/`)
+		return link, 0
 	}
-	// val is relative to parent URL.
-	newUrl = parentUrl.JoinPath(`/`, newUrl.Path)
-	newUrlStr = strings.TrimSuffix(newUrl.String(), `/`)
-	wrk.linkq <- linkQueue{
-		parentUrl: parentUrl,
-		url:       newUrlStr,
-		kind:      kind,
+	if val[0] == '/' {
+		// val is absolute to parent URL.
+		newUrl = wrk.baseUrl.JoinPath(newUrl.Path)
+	} else {
+		// val is relative to parent URL.
+		newUrl = parentUrl.JoinPath(`/`, newUrl.Path)
+	}
+	link = strings.TrimSuffix(newUrl.String(), `/`)
+	return link, 0
+}
+
+func (wrk *worker) pushResult(resultq map[string]linkQueue) {
+	var tick = time.NewTicker(100 * time.Millisecond)
+	for {
+		select {
+		case wrk.resultq <- resultq:
+			tick.Stop()
+			return
+		case <-tick.C:
+		}
 	}
 }

@@ -11,6 +11,21 @@ import (
 
 type linkQueue struct {
 	parentUrl *url.URL
-	url       string
-	kind      atom.Atom
+
+	// The error from scan.
+	errScan error
+
+	// url being scanned.
+	url string
+
+	// kind of url, its either an anchor or image.
+	// It set to 0 if url is the first URL being scanned.
+	kind atom.Atom
+
+	// Status of link after scan, its mostly used the HTTP status code.
+	// 0: link is the result of scan, not processed yet.
+	// StatusBadLink: link is invalid, not parseable or unreachable.
+	// 200 - 211: OK.
+	// 400 - 511: Error.
+	status int
 }
