@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 M. Shulhan <ms@kilabit.info>
 // SPDX-License-Identifier: GPL-3.0-only
 
-package deadlinks
+package jarink
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
-type worker struct {
+type brokenlinksWorker struct {
 	// seenLink store the URL being or has been scanned and its HTTP
 	// status code.
 	seenLink map[string]int
@@ -26,7 +26,7 @@ type worker struct {
 
 	// result contains the final result after all of the pages has been
 	// scanned.
-	result *Result
+	result *BrokenlinksResult
 
 	// The base URL that will be joined to relative or absolute
 	// links or image.
@@ -35,18 +35,18 @@ type worker struct {
 	// The URL to scan.
 	scanUrl *url.URL
 
-	opts ScanOptions
+	opts BrokenlinksOptions
 
 	// wg sync the goroutine scanner.
 	wg sync.WaitGroup
 }
 
-func newWorker(opts ScanOptions) (wrk *worker, err error) {
-	wrk = &worker{
+func newWorker(opts BrokenlinksOptions) (wrk *brokenlinksWorker, err error) {
+	wrk = &brokenlinksWorker{
 		opts:     opts,
 		seenLink: map[string]int{},
 		resultq:  make(chan map[string]linkQueue, 100),
-		result:   newResult(),
+		result:   newBrokenlinksResult(),
 	}
 
 	wrk.scanUrl, err = url.Parse(opts.Url)
@@ -66,7 +66,7 @@ func newWorker(opts ScanOptions) (wrk *worker, err error) {
 	return wrk, nil
 }
 
-func (wrk *worker) run() (result *Result, err error) {
+func (wrk *brokenlinksWorker) run() (result *BrokenlinksResult, err error) {
 	// Scan the first URL to make sure that the server is reachable.
 	var firstLinkq = linkQueue{
 		parentUrl: nil,
@@ -89,7 +89,7 @@ func (wrk *worker) run() (result *Result, err error) {
 			continue
 		}
 		if linkq.status >= http.StatusBadRequest {
-			wrk.markDead(linkq)
+			wrk.markBroken(linkq)
 			continue
 		}
 
@@ -118,7 +118,7 @@ func (wrk *worker) run() (result *Result, err error) {
 			var newList []linkQueue
 			for _, linkq := range resultq {
 				if linkq.status >= http.StatusBadRequest {
-					wrk.markDead(linkq)
+					wrk.markBroken(linkq)
 					continue
 				}
 				if linkq.status != 0 {
@@ -137,7 +137,7 @@ func (wrk *worker) run() (result *Result, err error) {
 				}
 				if seenStatus >= http.StatusBadRequest {
 					linkq.status = seenStatus
-					wrk.markDead(linkq)
+					wrk.markBroken(linkq)
 					continue
 				}
 				if seenStatus >= http.StatusOK {
@@ -158,7 +158,7 @@ func (wrk *worker) run() (result *Result, err error) {
 				seenStatus := wrk.seenLink[linkq.url]
 				if seenStatus >= http.StatusBadRequest {
 					linkq.status = seenStatus
-					wrk.markDead(linkq)
+					wrk.markBroken(linkq)
 					continue
 				}
 				if seenStatus >= http.StatusOK {
@@ -189,7 +189,7 @@ func (wrk *worker) run() (result *Result, err error) {
 	return wrk.result, nil
 }
 
-func (wrk *worker) markDead(linkq linkQueue) {
+func (wrk *brokenlinksWorker) markBroken(linkq linkQueue) {
 	var parentUrl = linkq.parentUrl.String()
 	var listBroken = wrk.result.PageLinks[parentUrl]
 	var brokenLink = Broken{
@@ -206,7 +206,7 @@ func (wrk *worker) markDead(linkq linkQueue) {
 }
 
 // scan fetch the HTML page or image to check if its valid.
-func (wrk *worker) scan(linkq linkQueue) {
+func (wrk *brokenlinksWorker) scan(linkq linkQueue) {
 	defer func() {
 		if wrk.opts.IsVerbose && linkq.errScan != nil {
 			fmt.Printf("error: %d %s error=%v\n", linkq.status,
@@ -308,7 +308,7 @@ func (wrk *worker) scan(linkq linkQueue) {
 	go wrk.pushResult(resultq)
 }
 
-func (wrk *worker) processLink(parentUrl *url.URL, val string, kind atom.Atom) (
+func (wrk *brokenlinksWorker) processLink(parentUrl *url.URL, val string, kind atom.Atom) (
 	linkq *linkQueue,
 ) {
 	if len(val) == 0 {
@@ -356,7 +356,7 @@ func (wrk *worker) processLink(parentUrl *url.URL, val string, kind atom.Atom) (
 	return linkq
 }
 
-func (wrk *worker) pushResult(resultq map[string]linkQueue) {
+func (wrk *brokenlinksWorker) pushResult(resultq map[string]linkQueue) {
 	var tick = time.NewTicker(100 * time.Millisecond)
 	for {
 		select {

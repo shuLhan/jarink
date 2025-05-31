@@ -11,7 +11,7 @@ import (
 	"os"
 	"strings"
 
-	"git.sr.ht/~shulhan/deadlinks"
+	"git.sr.ht/~shulhan/jarink"
 )
 
 func main() {
@@ -28,18 +28,18 @@ func main() {
 	}
 
 	cmd = strings.ToLower(cmd)
-	if cmd == "scan" {
-		var scanOpts = deadlinks.ScanOptions{
+	if cmd == "brokenlinks" {
+		var brokenlinksOpts = jarink.BrokenlinksOptions{
 			Url:       flag.Arg(1),
 			IsVerbose: optVerbose,
 		}
-		if scanOpts.Url == "" {
+		if brokenlinksOpts.Url == "" {
 			goto invalid_command
 		}
 
-		var result *deadlinks.Result
+		var result *jarink.BrokenlinksResult
 		var err error
-		result, err = deadlinks.Scan(scanOpts)
+		result, err = jarink.Brokenlinks(brokenlinksOpts)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
@@ -60,27 +60,34 @@ invalid_command:
 
 func usage() {
 	log.Println(`
-deadlinks <COMMAND> <args...>
+Jarink is a program to help web administrator to maintains their website.
 
-Deadlinks is a program to scan for invalid links inside HTML page on the live
-web server.
-Invalid links will be scanned on anchor href attribute ("<a href=...>") or on
-the image src attribute ("<img src=...").
+== Synopsis
+
+	jarink [OPTIONS] <COMMAND> <args...>
+
+Available commands,
+
+	brokenlinks - scan the website for broken links (page and images).
 
 == Usage
 
-[OPTIONS] scan URL
+[OPTIONS] brokenlinks URL
 
-	Start scanning for deadlinks on the web server pointed by URL.
-	Once finished it will print the page and list of dead links inside
+	Start scanning for broken links on the web server pointed by URL.
+	Invalid links will be scanned on anchor href attribute
+	("<a href=...>") or on the image src attribute ("<img src=...").
+
+	Once finished it will print the page and list of broken links inside
 	that page in JSON format.
+
 	This command accept the following options,
 
-	-verbose : print the page that being scanned.
+		-verbose : print the page that being scanned.
 
 	Example,
 
-	$ deadlinks scan https://kilabit.info
+	$ jarink scan https://kilabit.info
 	{
 	  "https://kilabit.info/some/page": [
 	    {
@@ -107,5 +114,5 @@ the image src attribute ("<img src=...").
 	}
 
 --
-deadlinks v` + deadlinks.Version)
+jarink v` + jarink.Version)
 }

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 M. Shulhan <ms@kilabit.info>
 // SPDX-License-Identifier: GPL-3.0-only
 
-package deadlinks_test
+package jarink_test
 
 import (
 	"log"
@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"git.sr.ht/~shulhan/deadlinks"
+	"git.sr.ht/~shulhan/jarink"
 	libnet "git.sr.ht/~shulhan/pakakeh.go/lib/net"
 	"git.sr.ht/~shulhan/pakakeh.go/lib/test"
 )
@@ -71,25 +71,25 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestDeadLinks_Scan(t *testing.T) {
+func TestBrokenlinks(t *testing.T) {
 	var testUrl = `http://` + testAddress
 
 	type testCase struct {
-		exp      map[string][]deadlinks.Broken
+		exp      map[string][]jarink.Broken
 		scanUrl  string
 		expError string
 	}
 
 	listCase := []testCase{{
 		scanUrl:  `127.0.0.1:14594`,
-		expError: `Scan: invalid URL "127.0.0.1:14594"`,
+		expError: `brokenlinks: invalid URL "127.0.0.1:14594"`,
 	}, {
 		scanUrl:  `http://127.0.0.1:14594`,
-		expError: `Scan: Get "http://127.0.0.1:14594": dial tcp 127.0.0.1:14594: connect: connection refused`,
+		expError: `brokenlinks: Get "http://127.0.0.1:14594": dial tcp 127.0.0.1:14594: connect: connection refused`,
 	}, {
 		scanUrl: testUrl,
-		exp: map[string][]deadlinks.Broken{
-			testUrl: []deadlinks.Broken{
+		exp: map[string][]jarink.Broken{
+			testUrl: []jarink.Broken{
 				{
 					Link: testUrl + `/broken.png`,
 					Code: http.StatusNotFound,
@@ -99,20 +99,20 @@ func TestDeadLinks_Scan(t *testing.T) {
 				}, {
 					Link:  `http://127.0.0.1:abc`,
 					Error: `parse "http://127.0.0.1:abc": invalid port ":abc" after host`,
-					Code:  deadlinks.StatusBadLink,
+					Code:  jarink.StatusBadLink,
 				}, {
 					Link:  `http:/127.0.0.1:11836`,
 					Error: `Head "http:/127.0.0.1:11836": http: no Host in request URL`,
-					Code:  deadlinks.StatusBadLink,
+					Code:  jarink.StatusBadLink,
 				},
 			},
-			testUrl + `/broken.html`: []deadlinks.Broken{
+			testUrl + `/broken.html`: []jarink.Broken{
 				{
 					Link: testUrl + `/brokenPage`,
 					Code: http.StatusNotFound,
 				},
 			},
-			testUrl + `/page2`: []deadlinks.Broken{
+			testUrl + `/page2`: []jarink.Broken{
 				{
 					Link: testUrl + `/broken.png`,
 					Code: http.StatusNotFound,
@@ -127,8 +127,8 @@ func TestDeadLinks_Scan(t *testing.T) {
 		},
 	}, {
 		scanUrl: testUrl + `/page2`,
-		exp: map[string][]deadlinks.Broken{
-			testUrl: []deadlinks.Broken{
+		exp: map[string][]jarink.Broken{
+			testUrl: []jarink.Broken{
 				{
 					Link: testUrl + `/broken.png`,
 					Code: http.StatusNotFound,
@@ -138,20 +138,20 @@ func TestDeadLinks_Scan(t *testing.T) {
 				}, {
 					Link:  `http://127.0.0.1:abc`,
 					Error: `parse "http://127.0.0.1:abc": invalid port ":abc" after host`,
-					Code:  deadlinks.StatusBadLink,
+					Code:  jarink.StatusBadLink,
 				}, {
 					Link:  `http:/127.0.0.1:11836`,
 					Error: `Head "http:/127.0.0.1:11836": http: no Host in request URL`,
-					Code:  deadlinks.StatusBadLink,
+					Code:  jarink.StatusBadLink,
 				},
 			},
-			testUrl + `/broken.html`: []deadlinks.Broken{
+			testUrl + `/broken.html`: []jarink.Broken{
 				{
 					Link: testUrl + `/brokenPage`,
 					Code: http.StatusNotFound,
 				},
 			},
-			testUrl + `/page2`: []deadlinks.Broken{
+			testUrl + `/page2`: []jarink.Broken{
 				{
 					Link: testUrl + `/broken.png`,
 					Code: http.StatusNotFound,
@@ -167,15 +167,15 @@ func TestDeadLinks_Scan(t *testing.T) {
 	}}
 
 	var (
-		result *deadlinks.Result
+		result *jarink.BrokenlinksResult
 		err    error
 	)
 	for _, tcase := range listCase {
-		t.Logf(`--- Scan: %s`, tcase.scanUrl)
-		var scanOpts = deadlinks.ScanOptions{
+		t.Logf(`--- brokenlinks: %s`, tcase.scanUrl)
+		var brokenlinksOpts = jarink.BrokenlinksOptions{
 			Url: tcase.scanUrl,
 		}
-		result, err = deadlinks.Scan(scanOpts)
+		result, err = jarink.Brokenlinks(brokenlinksOpts)
 		if err != nil {
 			test.Assert(t, tcase.scanUrl+` error`,
 				tcase.expError, err.Error())

@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2025 M. Shulhan <ms@kilabit.info>
 // SPDX-License-Identifier: GPL-3.0-only
 
-module git.sr.ht/~shulhan/deadlinks
+module git.sr.ht/~shulhan/jarink
 
-go 1.25
+go 1.24
 
 require (
 	git.sr.ht/~shulhan/pakakeh.go v0.60.1
