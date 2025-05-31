@@ -98,6 +98,7 @@ func (wrk *worker) run() (result *Result, err error) {
 		go wrk.scan(linkq)
 	}
 
+	var tick = time.NewTicker(500 * time.Millisecond)
 	var listWaitStatus []linkQueue
 	var isScanning = true
 	for isScanning {
@@ -149,7 +150,7 @@ func (wrk *worker) run() (result *Result, err error) {
 				listWaitStatus = append(listWaitStatus, linkq)
 			}
 
-		default:
+		case <-tick.C:
 			wrk.wg.Wait()
 			if len(wrk.resultq) != 0 {
 				continue
