@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +36,8 @@ type brokenlinksWorker struct {
 	// The URL to scan.
 	scanUrl *url.URL
 
+	log *log.Logger
+
 	opts BrokenlinksOptions
 
 	// wg sync the goroutine scanner.
@@ -47,6 +50,7 @@ func newWorker(opts BrokenlinksOptions) (wrk *brokenlinksWorker, err error) {
 		seenLink: map[string]int{},
 		resultq:  make(chan map[string]linkQueue, 100),
 		result:   newBrokenlinksResult(),
+		log:      log.New(os.Stderr, ``, log.LstdFlags),
 	}
 
 	wrk.scanUrl, err = url.Parse(opts.Url)
@@ -209,7 +213,7 @@ func (wrk *brokenlinksWorker) markBroken(linkq linkQueue) {
 func (wrk *brokenlinksWorker) scan(linkq linkQueue) {
 	defer func() {
 		if wrk.opts.IsVerbose && linkq.errScan != nil {
-			fmt.Printf("error: %d %s error=%v\n", linkq.status,
+			wrk.log.Printf("error: %d %s error=%v\n", linkq.status,
 				linkq.url, linkq.errScan)
 		}
 		wrk.wg.Done()
@@ -222,12 +226,12 @@ func (wrk *brokenlinksWorker) scan(linkq linkQueue) {
 	)
 	if linkq.kind == atom.Img || linkq.isExternal {
 		if wrk.opts.IsVerbose {
-			fmt.Printf("scan: HEAD %s\n", linkq.url)
+			wrk.log.Printf("scan: HEAD %s\n", linkq.url)
 		}
 		httpResp, err = http.Head(linkq.url)
 	} else {
 		if wrk.opts.IsVerbose {
-			fmt.Printf("scan: GET %s\n", linkq.url)
+			wrk.log.Printf("scan: GET %s\n", linkq.url)
 		}
 		httpResp, err = http.Get(linkq.url)
 	}

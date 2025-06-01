@@ -15,6 +15,8 @@ import (
 )
 
 func main() {
+	log.SetFlags(0)
+
 	var optVerbose bool
 
 	flag.BoolVar(&optVerbose, `verbose`, false,
