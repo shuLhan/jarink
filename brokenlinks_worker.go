@@ -303,7 +303,7 @@ func (wrk *brokenlinksWorker) scan(linkq linkQueue) {
 		}
 		_, seen := resultq[nodeLink.url]
 		if !seen {
-			if !strings.HasPrefix(nodeLink.url, wrk.baseUrl.String()) {
+			if !strings.HasPrefix(nodeLink.url, wrk.scanUrl.String()) {
 				nodeLink.isExternal = true
 			}
 			resultq[nodeLink.url] = *nodeLink

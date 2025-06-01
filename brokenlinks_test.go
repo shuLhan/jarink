@@ -126,31 +126,10 @@ func TestBrokenlinks(t *testing.T) {
 			},
 		},
 	}, {
+		// Scanning on "/path" should not scan the the "/" or other
+		// pages other than below of "/path" itself.
 		scanUrl: testUrl + `/page2`,
 		exp: map[string][]jarink.Broken{
-			testUrl: []jarink.Broken{
-				{
-					Link: testUrl + `/broken.png`,
-					Code: http.StatusNotFound,
-				}, {
-					Link: testUrl + `/brokenPage`,
-					Code: http.StatusNotFound,
-				}, {
-					Link:  `http://127.0.0.1:abc`,
-					Error: `parse "http://127.0.0.1:abc": invalid port ":abc" after host`,
-					Code:  jarink.StatusBadLink,
-				}, {
-					Link:  `http:/127.0.0.1:11836`,
-					Error: `Head "http:/127.0.0.1:11836": http: no Host in request URL`,
-					Code:  jarink.StatusBadLink,
-				},
-			},
-			testUrl + `/broken.html`: []jarink.Broken{
-				{
-					Link: testUrl + `/brokenPage`,
-					Code: http.StatusNotFound,
-				},
-			},
 			testUrl + `/page2`: []jarink.Broken{
 				{
 					Link: testUrl + `/broken.png`,

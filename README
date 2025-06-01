@@ -20,8 +20,41 @@ Available commands,
         Links will be scanned on anchor href attribute ("<a href=...>") or
         on the image src attribute ("<img src=...").
 
+        The URL can be start from base or from sub path.
+        Scanning from path only report brokenlinks on that path and their
+        sub paths.
+        For example, given a website that have the following pages,
+
+                - web.tld (base)
+                - web.tld/page1
+                - web.tld/page1/sub1
+                - web.tld/page2
+                - web.tld/page2/sub1
+
+        Invoking brokenlinks with
+
+                $ jarink brokenlinks https://web.tld
+
+        will scan all of the pages, but invoking brokenlinks on path
+        "/page2"
+
+                $ jarink brokenlinks https://web.tld/page2
+
+        only scan "/page2" and "/page2/sub1".
+
         Once finished it will print the page and list of broken links in
-        JSON format to standard output.
+        JSON format to standard output,
+
+                {
+                        "$PAGE": [{
+                                "Link": <string>,
+                                "Error": <string>,
+                                "Code": <integer>
+                        },
+                        ...
+                        ],
+                        ...
+                }
 
         This command accept the following options,
 
