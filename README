@@ -1,54 +1,63 @@
 = Jarink
 
-Jarink is a program to help web administrator to maintains their website.
+Jarink is a program to help web administrator and developers to inspect
+and maintains their website.
 
 == Synopsis
 
-	jarink [OPTIONS] <COMMAND> <args...>
+        jarink [OPTIONS] <COMMAND> <args...>
 
 Available commands,
 
-	brokenlinks - scan the website for broken links (page and images).
+        brokenlinks - scan the website for broken links (page and images).
+        help - print the usage of the command.
 
 == Usage
 
 [OPTIONS] brokenlinks URL
 
-	Start scanning for broken links on the web server pointed by URL.
-	Invalid links will be scanned on anchor href attribute
-	("<a href=...>") or on the image src attribute ("<img src=...").
+        Start scanning for broken links on the web server pointed by URL.
+        Links will be scanned on anchor href attribute ("<a href=...>") or
+        on the image src attribute ("<img src=...").
 
-	Once finished it will print the page and list of broken links inside
-	that page in JSON format.
+        Once finished it will print the page and list of broken links in
+        JSON format to standard output.
 
-	This command accept the following options,
+        This command accept the following options,
 
-		-verbose : print the page that being scanned.
+                -verbose : print the page that being scanned to standard
+                           error.
 
-	Example,
+        Example,
 
-	$ jarink scan https://kilabit.info
-	{
-	  "https://kilabit.info/some/page": [
-	    {
-	      "Link": "https://kilabit.info/some/page/image.png",
-	      "Code": 404
-	    },
-	    {
-	      "Link": "https://external.com/link",
-	      "Error": "Internal server error",
-	      "Code": 500
-	    }
-	  ],
-	  "https://kilabit.info/another/page": [
-	    {
-	      "Link": "https://kilabit.info/another/page/image.png",
-	      "Code": 404
-	    },
-	    {
-	      "Link": "https://external.org/link",
-	      "Error": "Internal server error",
-	      "Code": 500
-	    }
-	  ]
-	}
+        $ jarink brokenlinks https://kilabit.info
+        {
+          "https://kilabit.info/some/page": [
+            {
+              "Link": "https://kilabit.info/some/page/image.png",
+              "Code": 404
+            },
+            {
+              "Link": "https://external.com/link",
+              "Error": "Internal server error",
+              "Code": 500
+            }
+          ],
+          "https://kilabit.info/another/page": [
+            {
+              "Link": "https://kilabit.info/another/page/image.png",
+              "Code": 404
+            },
+            {
+              "Link": "https://external.org/link",
+              "Error": "Internal server error",
+              "Code": 500
+            }
+          ]
+        }
+
+== Notes
+
+jarink version 0.1.0.
+
+Source code - https://git.sr.ht/~shulhan/jarink

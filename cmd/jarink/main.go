@@ -25,17 +25,15 @@ func main() {
 	flag.Parse()
 
 	var cmd = flag.Arg(0)
-	if cmd == "" {
-		goto invalid_command
-	}
-
 	cmd = strings.ToLower(cmd)
-	if cmd == "brokenlinks" {
+	switch cmd {
+	case `brokenlinks`:
 		var brokenlinksOpts = jarink.BrokenlinksOptions{
 			Url:       flag.Arg(1),
 			IsVerbose: optVerbose,
 		}
 		if brokenlinksOpts.Url == "" {
+			log.Printf(`Missing argument URL to be scanned.`)
 			goto invalid_command
 		}
 
@@ -53,69 +51,16 @@ func main() {
 		}
 		fmt.Printf("%s\n", resultJson)
 		return
+
+	case `help`:
+		log.Println(jarink.GoEmbedReadme)
+		return
+
+	default:
+		log.Printf(`Missing or invalid command %q`, cmd)
 	}
 
 invalid_command:
-	usage()
+	log.Printf(`Run "jarink help" for usage.`)
 	os.Exit(1)
-}
-
-func usage() {
-	log.Println(`= Jarink
-
-Jarink is a program to help web administrator to maintains their website.
-
-== Synopsis
-
-	jarink [OPTIONS] <COMMAND> <args...>
-
-Available commands,
-
-	brokenlinks - scan the website for broken links (page and images).
-
-== Usage
-
-[OPTIONS] brokenlinks URL
-
-	Start scanning for broken links on the web server pointed by URL.
-	Invalid links will be scanned on anchor href attribute
-	("<a href=...>") or on the image src attribute ("<img src=...").
-
-	Once finished it will print the page and list of broken links inside
-	that page in JSON format.
-
-	This command accept the following options,
-
-		-verbose : print the page that being scanned.
-
-	Example,
-
-	$ jarink scan https://kilabit.info
-	{
-	  "https://kilabit.info/some/page": [
-	    {
-	      "Link": "https://kilabit.info/some/page/image.png",
-	      "Code": 404
-	    },
-	    {
-	      "Link": "https://external.com/link",
-	      "Error": "Internal server error",
-	      "Code": 500
-	    }
-	  ],
-	  "https://kilabit.info/another/page": [
-	    {
-	      "Link": "https://kilabit.info/another/page/image.png",
-	      "Code": 404
-	    },
-	    {
-	      "Link": "https://external.org/link",
-	      "Error": "Internal server error",
-	      "Code": 500
-	    }
-	  ]
-	}
-
---
-jarink v` + jarink.Version)
 }
