@@ -47,9 +47,9 @@ Available commands,
 
                 {
                         "$PAGE": [{
-                                "Link": <string>,
-                                "Error": <string>,
-                                "Code": <integer>
+                                "link": <string>,
+                                "error": <string>,
+                                "code": <integer>
                         },
                         ...
                         ],
@@ -67,24 +67,24 @@ Available commands,
         {
           "https://kilabit.info/some/page": [
             {
-              "Link": "https://kilabit.info/some/page/image.png",
-              "Code": 404
+              "link": "https://kilabit.info/some/page/image.png",
+              "code": 404
             },
             {
-              "Link": "https://external.com/link",
-              "Error": "Internal server error",
-              "Code": 500
+              "link": "https://external.com/link",
+              "error": "Internal server error",
+              "code": 500
             }
           ],
           "https://kilabit.info/another/page": [
             {
-              "Link": "https://kilabit.info/another/page/image.png",
-              "Code": 404
+              "link": "https://kilabit.info/another/page/image.png",
+              "code": 404
             },
             {
-              "Link": "https://external.org/link",
-              "Error": "Internal server error",
-              "Code": 500
+              "link": "https://external.org/link",
+              "error": "Internal server error",
+              "code": 500
             }
           ]
         }

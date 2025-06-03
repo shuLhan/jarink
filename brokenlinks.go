@@ -15,18 +15,18 @@ const Version = `0.1.0`
 // reachable during GET or HEAD, either timeout or IP or domain not exist.
 const StatusBadLink = 700
 
+// Broken store the broken link, HTTP status code, and the error message that
+// cause it.
+type Broken struct {
+	Link  string `json:"link"`
+	Error string `json:"error,omitempty"`
+	Code  int    `json:"code"`
+}
+
 // BrokenlinksOptions define the options for scanning broken links.
 type BrokenlinksOptions struct {
 	Url       string
 	IsVerbose bool
-}
-
-// Broken store the broken link, HTTP status code, and the error message that
-// cause it.
-type Broken struct {
-	Link  string
-	Error string `json:"omitempty"`
-	Code  int
 }
 
 // BrokenlinksResult store the result of scanning for broken links.
