@@ -82,7 +82,7 @@ func newWorker(opts BrokenlinksOptions) (wrk *brokenlinksWorker, err error) {
 	}
 
 	wrk.pastResult = newBrokenlinksResult()
-	err = json.Unmarshal(pastresult, &wrk.pastResult.PageLinks)
+	err = json.Unmarshal(pastresult, &wrk.pastResult)
 	if err != nil {
 		return nil, err
 	}

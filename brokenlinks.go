@@ -33,7 +33,7 @@ type BrokenlinksOptions struct {
 // BrokenlinksResult store the result of scanning for broken links.
 type BrokenlinksResult struct {
 	// PageLinks store the page and its broken links.
-	PageLinks map[string][]Broken
+	PageLinks map[string][]Broken `json:"page_links"`
 }
 
 func newBrokenlinksResult() *BrokenlinksResult {

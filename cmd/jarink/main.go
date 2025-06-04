@@ -45,7 +45,7 @@ func main() {
 		}
 
 		var resultJson []byte
-		resultJson, err = json.MarshalIndent(result.PageLinks, ``, `  `)
+		resultJson, err = json.MarshalIndent(result, ``, `  `)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
