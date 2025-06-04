@@ -5,6 +5,7 @@ package jarink
 
 import (
 	"net/url"
+	"strings"
 
 	"golang.org/x/net/html/atom"
 )
@@ -32,4 +33,23 @@ type linkQueue struct {
 	// 200 - 211: OK.
 	// 400 - 511: Error.
 	status int
+}
+
+// checkExternal set the isExternal field to be true if
+//
+// (1) [linkQueue.url] does not start with [brokenlinksWorker.scanUrl]
+//
+// (2) linkQueue is from scanPastResult, indicated by non-nil
+// [brokenlinksWorker.pastResult].
+// In this case, we did not want to scan the other pages from the same scanUrl
+// domain.
+func (linkq *linkQueue) checkExternal(wrk *brokenlinksWorker) {
+	if !strings.HasPrefix(linkq.url, wrk.scanUrl.String()) {
+		linkq.isExternal = true
+		return
+	}
+	if wrk.pastResult != nil {
+		linkq.isExternal = true
+		return
+	}
 }

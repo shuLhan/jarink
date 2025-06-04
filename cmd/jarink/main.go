@@ -17,10 +17,13 @@ import (
 func main() {
 	log.SetFlags(0)
 
-	var optVerbose bool
+	var brokenlinksOpts = jarink.BrokenlinksOptions{}
 
-	flag.BoolVar(&optVerbose, `verbose`, false,
-		`print additional information while running`)
+	flag.BoolVar(&brokenlinksOpts.IsVerbose, `verbose`, false,
+		`Print additional information while running.`)
+
+	flag.StringVar(&brokenlinksOpts.PastResultFile, `past-result`, ``,
+		`Scan only pages with broken links from the past JSON result.`)
 
 	flag.Parse()
 
@@ -28,10 +31,7 @@ func main() {
 	cmd = strings.ToLower(cmd)
 	switch cmd {
 	case `brokenlinks`:
-		var brokenlinksOpts = jarink.BrokenlinksOptions{
-			Url:       flag.Arg(1),
-			IsVerbose: optVerbose,
-		}
+		brokenlinksOpts.Url = flag.Arg(1)
 		if brokenlinksOpts.Url == "" {
 			log.Printf(`Missing argument URL to be scanned.`)
 			goto invalid_command

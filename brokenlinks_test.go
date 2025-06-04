@@ -4,6 +4,7 @@
 package jarink_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -103,5 +104,63 @@ func TestBrokenlinks(t *testing.T) {
 		//got, _ := json.MarshalIndent(result.PageLinks, ``, `  `)
 		//t.Logf(`got=%s`, got)
 		test.Assert(t, tcase.scanUrl, tcase.exp, result.PageLinks)
+	}
+}
+
+// Test running Brokenlinks with file PastResultFile is set.
+// The PastResultFile is modified to only report errors on "/page2".
+func TestBrokenlinks_pastResult(t *testing.T) {
+	var testUrl = `http://` + testAddress
+
+	type testCase struct {
+		exp      map[string][]jarink.Broken
+		expError string
+		opts     jarink.BrokenlinksOptions
+	}
+
+	listCase := []testCase{{
+		// With invalid file.
+		opts: jarink.BrokenlinksOptions{
+			Url:            testUrl,
+			PastResultFile: `testdata/invalid`,
+		},
+		expError: `brokenlinks: open testdata/invalid: no such file or directory`,
+	}, {
+		// With valid file.
+		opts: jarink.BrokenlinksOptions{
+			Url:            testUrl,
+			PastResultFile: `testdata/past_result.json`,
+		},
+		exp: map[string][]jarink.Broken{
+			testUrl + `/page2`: []jarink.Broken{
+				{
+					Link: testUrl + `/broken.png`,
+					Code: http.StatusNotFound,
+				}, {
+					Link: testUrl + `/page2/broken/relative`,
+					Code: http.StatusNotFound,
+				}, {
+					Link: testUrl + `/page2/broken2.png`,
+					Code: http.StatusNotFound,
+				},
+			},
+		},
+	}}
+
+	var (
+		result *jarink.BrokenlinksResult
+		err    error
+	)
+	for _, tcase := range listCase {
+		t.Logf(`--- brokenlinks: %s`, tcase.opts.Url)
+		result, err = jarink.Brokenlinks(tcase.opts)
+		if err != nil {
+			test.Assert(t, tcase.opts.Url+` error`,
+				tcase.expError, err.Error())
+			continue
+		}
+		got, _ := json.MarshalIndent(result.PageLinks, ``, `  `)
+		t.Logf(`got=%s`, got)
+		test.Assert(t, tcase.opts.Url, tcase.exp, result.PageLinks)
 	}
 }

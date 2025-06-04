@@ -25,8 +25,9 @@ type Broken struct {
 
 // BrokenlinksOptions define the options for scanning broken links.
 type BrokenlinksOptions struct {
-	Url       string
-	IsVerbose bool
+	Url            string
+	PastResultFile string
+	IsVerbose      bool
 }
 
 // BrokenlinksResult store the result of scanning for broken links.

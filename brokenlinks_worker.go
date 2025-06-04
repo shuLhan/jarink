@@ -4,6 +4,7 @@
 package jarink
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -28,6 +29,10 @@ type brokenlinksWorker struct {
 	// result contains the final result after all of the pages has been
 	// scanned.
 	result *BrokenlinksResult
+
+	// pastResult containts the past scan result, loaded from file
+	// [BrokenlinksOptions.PastResultFile].
+	pastResult *BrokenlinksResult
 
 	// The base URL that will be joined to relative or absolute
 	// links or image.
@@ -57,7 +62,6 @@ func newWorker(opts BrokenlinksOptions) (wrk *brokenlinksWorker, err error) {
 	if err != nil {
 		return nil, fmt.Errorf(`invalid URL %q`, opts.Url)
 	}
-
 	wrk.scanUrl.Path = strings.TrimSuffix(wrk.scanUrl.Path, `/`)
 	wrk.scanUrl.Fragment = ""
 	wrk.scanUrl.RawFragment = ""
@@ -67,10 +71,36 @@ func newWorker(opts BrokenlinksOptions) (wrk *brokenlinksWorker, err error) {
 		Host:   wrk.scanUrl.Host,
 	}
 
+	if opts.PastResultFile == "" {
+		// Run with normal scan.
+		return wrk, nil
+	}
+
+	pastresult, err := os.ReadFile(opts.PastResultFile)
+	if err != nil {
+		return nil, err
+	}
+
+	wrk.pastResult = newBrokenlinksResult()
+	err = json.Unmarshal(pastresult, &wrk.pastResult.PageLinks)
+	if err != nil {
+		return nil, err
+	}
+
 	return wrk, nil
 }
 
 func (wrk *brokenlinksWorker) run() (result *BrokenlinksResult, err error) {
+	if wrk.pastResult == nil {
+		result, err = wrk.scanAll()
+	} else {
+		result, err = wrk.scanPastResult()
+	}
+	return result, err
+}
+
+// scanAll scan all pages start from [BrokenlinksOptions.Url].
+func (wrk *brokenlinksWorker) scanAll() (result *BrokenlinksResult, err error) {
 	// Scan the first URL to make sure that the server is reachable.
 	var firstLinkq = linkQueue{
 		parentUrl: nil,
@@ -108,73 +138,7 @@ func (wrk *brokenlinksWorker) run() (result *BrokenlinksResult, err error) {
 	for isScanning {
 		select {
 		case resultq := <-wrk.resultq:
-
-			// The resultq contains the original URL being scanned
-			// and its child links.
-			// For example, scanning "http://example.tld" result
-			// in
-			//
-			//	"http://example.tld": {status=200}
-			//	"http://example.tld/page": {status=0}
-			//	"http://example.tld/image.png": {status=0}
-			//	"http://bad:domain/image.png": {status=700}
-
-			var newList []linkQueue
-			for _, linkq := range resultq {
-				if linkq.status >= http.StatusBadRequest {
-					wrk.markBroken(linkq)
-					continue
-				}
-				if linkq.status != 0 {
-					// linkq is the result of scan with
-					// non error status.
-					wrk.seenLink[linkq.url] = linkq.status
-					continue
-				}
-
-				seenStatus, seen := wrk.seenLink[linkq.url]
-				if !seen {
-					wrk.seenLink[linkq.url] = http.StatusProcessing
-					wrk.wg.Add(1)
-					go wrk.scan(linkq)
-					continue
-				}
-				if seenStatus >= http.StatusBadRequest {
-					linkq.status = seenStatus
-					wrk.markBroken(linkq)
-					continue
-				}
-				if seenStatus >= http.StatusOK {
-					// The link has been processed and its
-					// not an error.
-					continue
-				}
-				if seenStatus == http.StatusProcessing {
-					// The link being processed by other
-					// goroutine.
-					linkq.status = seenStatus
-					newList = append(newList, linkq)
-					continue
-				}
-				log.Fatalf("link=%s status=%d", linkq.url, linkq.status)
-			}
-			for _, linkq := range listWaitStatus {
-				seenStatus := wrk.seenLink[linkq.url]
-				if seenStatus >= http.StatusBadRequest {
-					linkq.status = seenStatus
-					wrk.markBroken(linkq)
-					continue
-				}
-				if seenStatus >= http.StatusOK {
-					continue
-				}
-				if seenStatus == http.StatusProcessing {
-					// Scanning still in progress.
-					newList = append(newList, linkq)
-					continue
-				}
-			}
-			listWaitStatus = newList
+			listWaitStatus = wrk.processResult(resultq, listWaitStatus)
 
 		case <-tick.C:
 			wrk.wg.Wait()
@@ -191,6 +155,114 @@ func (wrk *brokenlinksWorker) run() (result *BrokenlinksResult, err error) {
 	}
 	wrk.result.sort()
 	return wrk.result, nil
+}
+
+// scanPastResult scan only pages reported inside
+// [BrokenlinksResult.PageLinks].
+func (wrk *brokenlinksWorker) scanPastResult() (
+	result *BrokenlinksResult, err error,
+) {
+	go func() {
+		for page := range wrk.pastResult.PageLinks {
+			var linkq = linkQueue{
+				parentUrl: nil,
+				url:       page,
+				status:    http.StatusProcessing,
+			}
+			wrk.seenLink[linkq.url] = http.StatusProcessing
+			wrk.wg.Add(1)
+			go wrk.scan(linkq)
+		}
+	}()
+
+	var tick = time.NewTicker(500 * time.Millisecond)
+	var listWaitStatus []linkQueue
+	var isScanning = true
+	for isScanning {
+		select {
+		case resultq := <-wrk.resultq:
+			listWaitStatus = wrk.processResult(resultq, listWaitStatus)
+
+		case <-tick.C:
+			wrk.wg.Wait()
+			if len(wrk.resultq) != 0 {
+				continue
+			}
+			if len(listWaitStatus) != 0 {
+				// There are links that still waiting for
+				// scanning to be completed.
+				continue
+			}
+			isScanning = false
+		}
+	}
+	wrk.result.sort()
+	return wrk.result, nil
+}
+
+// processResult the resultq contains the original URL being scanned
+// and its child links.
+// For example, scanning "http://example.tld" result in
+//
+//	"http://example.tld": {status=200}
+//	"http://example.tld/page": {status=0}
+//	"http://example.tld/image.png": {status=0}
+//	"http://bad:domain/image.png": {status=700}
+func (wrk *brokenlinksWorker) processResult(
+	resultq map[string]linkQueue, listWaitStatus []linkQueue,
+) (
+	newList []linkQueue,
+) {
+	for _, linkq := range resultq {
+		if linkq.status >= http.StatusBadRequest {
+			wrk.markBroken(linkq)
+			continue
+		}
+		if linkq.status != 0 {
+			// linkq is the result of scan with
+			// non error status.
+			wrk.seenLink[linkq.url] = linkq.status
+			continue
+		}
+
+		seenStatus, seen := wrk.seenLink[linkq.url]
+		if !seen {
+			wrk.seenLink[linkq.url] = http.StatusProcessing
+			wrk.wg.Add(1)
+			go wrk.scan(linkq)
+			continue
+		}
+		if seenStatus >= http.StatusBadRequest {
+			linkq.status = seenStatus
+			wrk.markBroken(linkq)
+			continue
+		}
+		if seenStatus >= http.StatusOK {
+			// The link has been processed and its
+			// not an error.
+			continue
+		}
+		// The link being processed by other goroutine.
+		linkq.status = seenStatus
+		newList = append(newList, linkq)
+	}
+	for _, linkq := range listWaitStatus {
+		seenStatus := wrk.seenLink[linkq.url]
+		if seenStatus >= http.StatusBadRequest {
+			linkq.status = seenStatus
+			wrk.markBroken(linkq)
+			continue
+		}
+		if seenStatus >= http.StatusOK {
+			continue
+		}
+		if seenStatus == http.StatusProcessing {
+			// Scanning still in progress.
+			newList = append(newList, linkq)
+			continue
+		}
+	}
+	return newList
 }
 
 func (wrk *brokenlinksWorker) markBroken(linkq linkQueue) {
@@ -303,9 +375,7 @@ func (wrk *brokenlinksWorker) scan(linkq linkQueue) {
 		}
 		_, seen := resultq[nodeLink.url]
 		if !seen {
-			if !strings.HasPrefix(nodeLink.url, wrk.scanUrl.String()) {
-				nodeLink.isExternal = true
-			}
+			nodeLink.checkExternal(wrk)
 			resultq[nodeLink.url] = *nodeLink
 		}
 	}

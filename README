@@ -7,22 +7,49 @@ and maintains their website.
 
         jarink [OPTIONS] <COMMAND> <args...>
 
-Available commands,
+Available command,
 
         brokenlinks - scan the website for broken links (page and images).
-        help - print the usage of the command.
+        help        - print the usage of the command.
 
 == Usage
 
-[OPTIONS] brokenlinks URL
+[OPTIONS] brokenlinks <URL>
 
-        Start scanning for broken links on the web server pointed by URL.
+        Scan for broken links on the web server pointed by URL.
         Links will be scanned on anchor href attribute ("<a href=...>") or
         on the image src attribute ("<img src=...").
 
         The URL can be start from base or from sub path.
         Scanning from path only report brokenlinks on that path and their
         sub paths.
+
+        Once finished it will print the page and list of broken links in
+        JSON format to standard output,
+
+                {
+                        "$PAGE": [{
+                                "link": <string>,
+                                "error": <string>,
+                                "code": <integer>
+                        },
+                        ...
+                        ],
+                        ...
+                }
+
+        This command accept the following options,
+
+        -verbose
+
+                Print the page that being scanned to standard error.
+
+        -past-result=<path to JSON file>
+
+                Scan only the pages reported by result from past scan based
+                on the content in JSON file. This minimize the time to
+                re-scan the pages once we have fixed the URLs.
+
         For example, given a website that have the following pages,
 
                 - web.tld (base)
@@ -42,52 +69,6 @@ Available commands,
 
         only scan "/page2" and "/page2/sub1".
 
-        Once finished it will print the page and list of broken links in
-        JSON format to standard output,
-
-                {
-                        "$PAGE": [{
-                                "link": <string>,
-                                "error": <string>,
-                                "code": <integer>
-                        },
-                        ...
-                        ],
-                        ...
-                }
-
-        This command accept the following options,
-
-                -verbose : print the page that being scanned to standard
-                           error.
-
-        Example,
-
-        $ jarink brokenlinks https://kilabit.info
-        {
-          "https://kilabit.info/some/page": [
-            {
-              "link": "https://kilabit.info/some/page/image.png",
-              "code": 404
-            },
-            {
-              "link": "https://external.com/link",
-              "error": "Internal server error",
-              "code": 500
-            }
-          ],
-          "https://kilabit.info/another/page": [
-            {
-              "link": "https://kilabit.info/another/page/image.png",
-              "code": 404
-            },
-            {
-              "link": "https://external.org/link",
-              "error": "Internal server error",
-              "code": 500
-            }
-          ]
-        }
 
 == Notes
 
