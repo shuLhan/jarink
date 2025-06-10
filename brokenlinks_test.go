@@ -43,7 +43,7 @@ func TestBrokenlinks(t *testing.T) {
 					Code:  jarink.StatusBadLink,
 				}, {
 					Link:  `http:/127.0.0.1:11836`,
-					Error: `Head "http:/127.0.0.1:11836": http: no Host in request URL`,
+					Error: `Get "http:/127.0.0.1:11836": http: no Host in request URL`,
 					Code:  jarink.StatusBadLink,
 				},
 			},

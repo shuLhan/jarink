@@ -381,7 +381,7 @@ func (wrk *brokenlinksWorker) fetch(linkq linkQueue) (
 	const maxRetry = 5
 	var retry int
 	for retry < 5 {
-		if linkq.kind == atom.Img || linkq.isExternal {
+		if linkq.kind == atom.Img {
 			if wrk.opts.IsVerbose {
 				wrk.log.Printf("scan: HEAD %s\n", linkq.url)
 			}
