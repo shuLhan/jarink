@@ -5,8 +5,10 @@ package jarink
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -296,17 +298,7 @@ func (wrk *brokenlinksWorker) scan(linkq linkQueue) {
 		httpResp *http.Response
 		err      error
 	)
-	if linkq.kind == atom.Img || linkq.isExternal {
-		if wrk.opts.IsVerbose {
-			wrk.log.Printf("scan: HEAD %s\n", linkq.url)
-		}
-		httpResp, err = http.Head(linkq.url)
-	} else {
-		if wrk.opts.IsVerbose {
-			wrk.log.Printf("scan: GET %s\n", linkq.url)
-		}
-		httpResp, err = http.Get(linkq.url)
-	}
+	httpResp, err = wrk.fetch(linkq)
 	if err != nil {
 		linkq.status = StatusBadLink
 		linkq.errScan = err
@@ -380,6 +372,38 @@ func (wrk *brokenlinksWorker) scan(linkq linkQueue) {
 		}
 	}
 	go wrk.pushResult(resultq)
+}
+
+func (wrk *brokenlinksWorker) fetch(linkq linkQueue) (
+	httpResp *http.Response,
+	err error,
+) {
+	const maxRetry = 5
+	var retry int
+	for retry < 5 {
+		if linkq.kind == atom.Img || linkq.isExternal {
+			if wrk.opts.IsVerbose {
+				wrk.log.Printf("scan: HEAD %s\n", linkq.url)
+			}
+			httpResp, err = http.Head(linkq.url)
+		} else {
+			if wrk.opts.IsVerbose {
+				wrk.log.Printf("scan: GET %s\n", linkq.url)
+			}
+			httpResp, err = http.Get(linkq.url)
+		}
+		if err == nil {
+			return httpResp, nil
+		}
+		var errDNS *net.DNSError
+		if !errors.As(err, &errDNS) {
+			return nil, err
+		}
+		if errDNS.Timeout() {
+			retry++
+		}
+	}
+	return nil, err
 }
 
 func (wrk *brokenlinksWorker) processLink(parentUrl *url.URL, val string, kind atom.Atom) (
