@@ -18,8 +18,14 @@ import (
 func main() {
 	log.SetFlags(0)
 
-	var optIsVerbose bool
-	var optPastResult string
+	var (
+		optIgnoreStatus string
+		optIsVerbose    bool
+		optPastResult   string
+	)
+
+	flag.StringVar(&optIgnoreStatus, `ignore-status`, ``,
+		`Comma separated HTTP response status code to be ignored.`)
 
 	flag.BoolVar(&optIsVerbose, `verbose`, false,
 		`Print additional information while running.`)
@@ -34,6 +40,7 @@ func main() {
 	switch cmd {
 	case `brokenlinks`:
 		var opts = brokenlinks.Options{
+			IgnoreStatus:   optIgnoreStatus,
 			IsVerbose:      optIsVerbose,
 			PastResultFile: optPastResult,
 		}

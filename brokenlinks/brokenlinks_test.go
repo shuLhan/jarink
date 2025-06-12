@@ -4,7 +4,6 @@
 package brokenlinks_test
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -30,36 +29,8 @@ func TestMain(m *testing.M) {
 	var httpDirWeb = http.Dir(`testdata/web`)
 	var fshandle = http.FileServer(httpDirWeb)
 
-	go func() {
-		var mux = http.NewServeMux()
-		mux.Handle(`/`, fshandle)
-		var testServer = &http.Server{
-			Addr:           testAddress,
-			Handler:        mux,
-			ReadTimeout:    10 * time.Second,
-			WriteTimeout:   10 * time.Second,
-			MaxHeaderBytes: 1 << 20,
-		}
-		var err = testServer.ListenAndServe()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
-	go func() {
-		var mux = http.NewServeMux()
-		mux.Handle(`/`, fshandle)
-		var testServer = &http.Server{
-			Addr:           testExternalAddress,
-			Handler:        mux,
-			ReadTimeout:    10 * time.Second,
-			WriteTimeout:   10 * time.Second,
-			MaxHeaderBytes: 1 << 20,
-		}
-		var err = testServer.ListenAndServe()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
+	go testServer(fshandle)
+	go testExternalServer(fshandle)
 
 	var err = libnet.WaitAlive(`tcp`, testAddress, 5*time.Second)
 	if err != nil {
@@ -73,23 +44,67 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func testServer(fshandle http.Handler) {
+	var mux = http.NewServeMux()
+	mux.HandleFunc(`/page403`, page403)
+	mux.Handle(`/`, fshandle)
+	var testServer = &http.Server{
+		Addr:           testAddress,
+		Handler:        mux,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	var err = testServer.ListenAndServe()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func page403(resp http.ResponseWriter, req *http.Request) {
+	resp.WriteHeader(http.StatusForbidden)
+}
+
+func testExternalServer(fshandle http.Handler) {
+	var mux = http.NewServeMux()
+	mux.Handle(`/`, fshandle)
+	var testServer = &http.Server{
+		Addr:           testExternalAddress,
+		Handler:        mux,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	var err = testServer.ListenAndServe()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func TestBrokenlinks(t *testing.T) {
 	var testUrl = `http://` + testAddress
 
 	type testCase struct {
 		exp      map[string][]brokenlinks.Broken
-		scanUrl  string
 		expError string
+		opts     brokenlinks.Options
 	}
 
 	listCase := []testCase{{
-		scanUrl:  `127.0.0.1:14594`,
-		expError: `brokenlinks: invalid URL "127.0.0.1:14594"`,
+		opts: brokenlinks.Options{
+			Url: `127.0.0.1:14594`,
+		},
+		expError: `Scan: invalid URL "127.0.0.1:14594"`,
 	}, {
-		scanUrl:  `http://127.0.0.1:14594`,
-		expError: `brokenlinks: Get "http://127.0.0.1:14594": dial tcp 127.0.0.1:14594: connect: connection refused`,
+		opts: brokenlinks.Options{
+			Url: `http://127.0.0.1:14594`,
+		},
+		expError: `Scan: Get "http://127.0.0.1:14594": dial tcp 127.0.0.1:14594: connect: connection refused`,
 	}, {
-		scanUrl: testUrl,
+		opts: brokenlinks.Options{
+			Url:          testUrl,
+			IgnoreStatus: `403`,
+		},
 		exp: map[string][]brokenlinks.Broken{
 			testUrl: []brokenlinks.Broken{
 				{
@@ -130,67 +145,8 @@ func TestBrokenlinks(t *testing.T) {
 	}, {
 		// Scanning on "/path" should not scan the the "/" or other
 		// pages other than below of "/path" itself.
-		scanUrl: testUrl + `/page2`,
-		exp: map[string][]brokenlinks.Broken{
-			testUrl + `/page2`: []brokenlinks.Broken{
-				{
-					Link: testUrl + `/broken.png`,
-					Code: http.StatusNotFound,
-				}, {
-					Link: testUrl + `/page2/broken/relative`,
-					Code: http.StatusNotFound,
-				}, {
-					Link: testUrl + `/page2/broken2.png`,
-					Code: http.StatusNotFound,
-				},
-			},
-		},
-	}}
-
-	var (
-		result *brokenlinks.Result
-		err    error
-	)
-	for _, tcase := range listCase {
-		t.Logf(`--- brokenlinks: %s`, tcase.scanUrl)
-		var opts = brokenlinks.Options{
-			Url: tcase.scanUrl,
-		}
-		result, err = brokenlinks.Scan(opts)
-		if err != nil {
-			test.Assert(t, tcase.scanUrl+` error`,
-				tcase.expError, err.Error())
-			continue
-		}
-		//got, _ := json.MarshalIndent(result.BrokenLinks, ``, `  `)
-		//t.Logf(`got=%s`, got)
-		test.Assert(t, tcase.scanUrl, tcase.exp, result.BrokenLinks)
-	}
-}
-
-// Test running Brokenlinks with file PastResultFile is set.
-// The PastResultFile is modified to only report errors on "/page2".
-func TestBrokenlinks_pastResult(t *testing.T) {
-	var testUrl = `http://` + testAddress
-
-	type testCase struct {
-		exp      map[string][]brokenlinks.Broken
-		expError string
-		opts     brokenlinks.Options
-	}
-
-	listCase := []testCase{{
-		// With invalid file.
 		opts: brokenlinks.Options{
-			Url:            testUrl,
-			PastResultFile: `testdata/invalid`,
-		},
-		expError: `brokenlinks: open testdata/invalid: no such file or directory`,
-	}, {
-		// With valid file.
-		opts: brokenlinks.Options{
-			Url:            testUrl,
-			PastResultFile: `testdata/past_result.json`,
+			Url: testUrl + `/page2`,
 		},
 		exp: map[string][]brokenlinks.Broken{
 			testUrl + `/page2`: []brokenlinks.Broken{
@@ -220,8 +176,67 @@ func TestBrokenlinks_pastResult(t *testing.T) {
 				tcase.expError, err.Error())
 			continue
 		}
-		got, _ := json.MarshalIndent(result.BrokenLinks, ``, `  `)
-		t.Logf(`got=%s`, got)
+		//got, _ := json.MarshalIndent(result.BrokenLinks, ``, `  `)
+		//t.Logf(`got=%s`, got)
+		test.Assert(t, tcase.opts.Url, tcase.exp, result.BrokenLinks)
+	}
+}
+
+// Test running Brokenlinks with file PastResultFile is set.
+// The PastResultFile is modified to only report errors on "/page2".
+func TestBrokenlinks_pastResult(t *testing.T) {
+	var testUrl = `http://` + testAddress
+
+	type testCase struct {
+		exp      map[string][]brokenlinks.Broken
+		expError string
+		opts     brokenlinks.Options
+	}
+
+	listCase := []testCase{{
+		// With invalid file.
+		opts: brokenlinks.Options{
+			Url:            testUrl,
+			PastResultFile: `testdata/invalid`,
+		},
+		expError: `Scan: open testdata/invalid: no such file or directory`,
+	}, {
+		// With valid file.
+		opts: brokenlinks.Options{
+			Url:            testUrl,
+			PastResultFile: `testdata/past_result.json`,
+			IgnoreStatus:   `403`,
+		},
+		exp: map[string][]brokenlinks.Broken{
+			testUrl + `/page2`: []brokenlinks.Broken{
+				{
+					Link: testUrl + `/broken.png`,
+					Code: http.StatusNotFound,
+				}, {
+					Link: testUrl + `/page2/broken/relative`,
+					Code: http.StatusNotFound,
+				}, {
+					Link: testUrl + `/page2/broken2.png`,
+					Code: http.StatusNotFound,
+				},
+			},
+		},
+	}}
+
+	var (
+		result *brokenlinks.Result
+		err    error
+	)
+	for _, tcase := range listCase {
+		t.Logf(`--- brokenlinks: %s`, tcase.opts.Url)
+		result, err = brokenlinks.Scan(tcase.opts)
+		if err != nil {
+			test.Assert(t, tcase.opts.Url+` error`,
+				tcase.expError, err.Error())
+			continue
+		}
+		//got, _ := json.MarshalIndent(result.BrokenLinks, ``, `  `)
+		//t.Logf(`got=%s`, got)
 		test.Assert(t, tcase.opts.Url, tcase.exp, result.BrokenLinks)
 	}
 }

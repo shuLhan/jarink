@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -310,6 +311,10 @@ func (wrk *worker) scan(linkq linkQueue) {
 
 	linkq.status = httpResp.StatusCode
 	resultq[linkq.url] = linkq
+
+	if slices.Contains(wrk.opts.ignoreStatus, httpResp.StatusCode) {
+		return
+	}
 
 	if httpResp.StatusCode >= http.StatusBadRequest {
 		go wrk.pushResult(resultq)

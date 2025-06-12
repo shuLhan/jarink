@@ -46,13 +46,16 @@ JSON format to standard output,
 
 This command accept the following options,
 
-`-verbose`::
-Print the page that being scanned to standard error.
+`-ignore-status=<comma separated HTTP status code>`::
+List of HTTP status code that will be ignored during scan.
 
 `-past-result=<path to JSON file>`::
 Scan only the pages reported by result from past scan based
 on the content in JSON file.
 This minimize the time to re-scan the pages once we have fixed the URLs.
+
+`-verbose`::
+Print the page that being scanned to standard error.
 
 
 == Examples
@@ -76,6 +79,12 @@ Invoking brokenlinks on path "/page2" only scan "/page2" and "/page2/sub1".
 
 ----
 $ jarink brokenlinks https://web.tld/page2
+----
+
+Ignore HTTP status code 403 and 418,
+
+----
+$ jarink -ignore-status=403,418 brokenlinks https://web.tld/page2
 ----
 
 

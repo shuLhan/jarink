@@ -1,0 +1,53 @@
+// SPDX-FileCopyrightText: 2025 M. Shulhan <ms@kilabit.info>
+// SPDX-License-Identifier: GPL-3.0-only
+
+package brokenlinks
+
+import (
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+)
+
+// Options define the options for scanning broken links.
+type Options struct {
+	Url            string
+	PastResultFile string
+
+	// IgnoreStatus comma separated list HTTP status code that will be
+	// ignored on scan.
+	// Page that return one of the IgnoreStatus will be assumed as
+	// passed and not get processed.
+	// The status code must in between 100-511.
+	IgnoreStatus string
+	ignoreStatus []int
+
+	IsVerbose bool
+}
+
+func (opts *Options) init() (err error) {
+	var (
+		logp     = `Options`
+		listCode = strings.Split(opts.IgnoreStatus, ",")
+		val      string
+	)
+	for _, val = range listCode {
+		val = strings.TrimSpace(val)
+		if val == "" {
+			continue
+		}
+		var code int64
+		code, err = strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return fmt.Errorf(`%s: invalid status code %q`, logp, val)
+		}
+		if code < http.StatusContinue ||
+			code > http.StatusNetworkAuthenticationRequired {
+			return fmt.Errorf(`%s: status code %s out of range`, logp, val)
+		}
+
+		opts.ignoreStatus = append(opts.ignoreStatus, int(code))
+	}
+	return nil
+}
