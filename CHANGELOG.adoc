@@ -1,0 +1,26 @@
+// SPDX-FileCopyrightText: 2025 M. Shulhan <ms@kilabit.info>
+// SPDX-License-Identifier: GPL-3.0-only
+
+= jarink releases changelog
+:sectanchors:
+:toc:
+
+Change log of each release of the jarink software.
+
+[#jarink_v0_1_0]
+== jarink 0.1.0
+
+The first release of jarink provides the command "brokenlinks", to scan for
+broken links.
+The output of this command is list of page with its broken links in JSON
+format.
+
+This command accept the following options,
+
+`-verbose`::
+Print the page that being scanned to standard error.
+
+`-past-result=<path to JSON file>`::
+Scan only the pages reported by result from past scan based
+on the content in JSON file.
+This minimize the time to re-scan the pages once we have fixed the URLs.

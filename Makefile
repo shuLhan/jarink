@@ -17,3 +17,7 @@ test:
 	CGO_ENABLED=1 go test -failfast -timeout=1m -race \
 		-coverprofile=$(COVER_OUT) ./...
 	go tool cover -html=$(COVER_OUT) -o $(COVER_HTML)
+
+.PHONY: doc.serve
+doc.serve:
+	ciigo serve .
