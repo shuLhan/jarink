@@ -1,22 +1,83 @@
 // SPDX-FileCopyrightText: 2025 M. Shulhan <ms@kilabit.info>
 // SPDX-License-Identifier: GPL-3.0-only
 
-package jarink_test
+package brokenlinks_test
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
+	"os"
 	"testing"
+	"time"
 
-	"git.sr.ht/~shulhan/jarink"
+	libnet "git.sr.ht/~shulhan/pakakeh.go/lib/net"
 	"git.sr.ht/~shulhan/pakakeh.go/lib/test"
+
+	"git.sr.ht/~shulhan/jarink/brokenlinks"
 )
+
+// The test run two web servers that serve content on "testdata/web/".
+// The first web server is the one that we want to scan.
+// The second web server is external web server, where HTML pages should not
+// be parsed.
+
+const testAddress = `127.0.0.1:11836`
+const testExternalAddress = `127.0.0.1:11900`
+
+func TestMain(m *testing.M) {
+	log.SetFlags(0)
+	var httpDirWeb = http.Dir(`testdata/web`)
+	var fshandle = http.FileServer(httpDirWeb)
+
+	go func() {
+		var mux = http.NewServeMux()
+		mux.Handle(`/`, fshandle)
+		var testServer = &http.Server{
+			Addr:           testAddress,
+			Handler:        mux,
+			ReadTimeout:    10 * time.Second,
+			WriteTimeout:   10 * time.Second,
+			MaxHeaderBytes: 1 << 20,
+		}
+		var err = testServer.ListenAndServe()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+	go func() {
+		var mux = http.NewServeMux()
+		mux.Handle(`/`, fshandle)
+		var testServer = &http.Server{
+			Addr:           testExternalAddress,
+			Handler:        mux,
+			ReadTimeout:    10 * time.Second,
+			WriteTimeout:   10 * time.Second,
+			MaxHeaderBytes: 1 << 20,
+		}
+		var err = testServer.ListenAndServe()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	var err = libnet.WaitAlive(`tcp`, testAddress, 5*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = libnet.WaitAlive(`tcp`, testExternalAddress, 5*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	os.Exit(m.Run())
+}
 
 func TestBrokenlinks(t *testing.T) {
 	var testUrl = `http://` + testAddress
 
 	type testCase struct {
-		exp      map[string][]jarink.Broken
+		exp      map[string][]brokenlinks.Broken
 		scanUrl  string
 		expError string
 	}
@@ -29,8 +90,8 @@ func TestBrokenlinks(t *testing.T) {
 		expError: `brokenlinks: Get "http://127.0.0.1:14594": dial tcp 127.0.0.1:14594: connect: connection refused`,
 	}, {
 		scanUrl: testUrl,
-		exp: map[string][]jarink.Broken{
-			testUrl: []jarink.Broken{
+		exp: map[string][]brokenlinks.Broken{
+			testUrl: []brokenlinks.Broken{
 				{
 					Link: testUrl + `/broken.png`,
 					Code: http.StatusNotFound,
@@ -40,20 +101,20 @@ func TestBrokenlinks(t *testing.T) {
 				}, {
 					Link:  `http://127.0.0.1:abc`,
 					Error: `parse "http://127.0.0.1:abc": invalid port ":abc" after host`,
-					Code:  jarink.StatusBadLink,
+					Code:  brokenlinks.StatusBadLink,
 				}, {
 					Link:  `http:/127.0.0.1:11836`,
 					Error: `Get "http:/127.0.0.1:11836": http: no Host in request URL`,
-					Code:  jarink.StatusBadLink,
+					Code:  brokenlinks.StatusBadLink,
 				},
 			},
-			testUrl + `/broken.html`: []jarink.Broken{
+			testUrl + `/broken.html`: []brokenlinks.Broken{
 				{
 					Link: testUrl + `/brokenPage`,
 					Code: http.StatusNotFound,
 				},
 			},
-			testUrl + `/page2`: []jarink.Broken{
+			testUrl + `/page2`: []brokenlinks.Broken{
 				{
 					Link: testUrl + `/broken.png`,
 					Code: http.StatusNotFound,
@@ -70,8 +131,8 @@ func TestBrokenlinks(t *testing.T) {
 		// Scanning on "/path" should not scan the the "/" or other
 		// pages other than below of "/path" itself.
 		scanUrl: testUrl + `/page2`,
-		exp: map[string][]jarink.Broken{
-			testUrl + `/page2`: []jarink.Broken{
+		exp: map[string][]brokenlinks.Broken{
+			testUrl + `/page2`: []brokenlinks.Broken{
 				{
 					Link: testUrl + `/broken.png`,
 					Code: http.StatusNotFound,
@@ -87,15 +148,15 @@ func TestBrokenlinks(t *testing.T) {
 	}}
 
 	var (
-		result *jarink.BrokenlinksResult
+		result *brokenlinks.Result
 		err    error
 	)
 	for _, tcase := range listCase {
 		t.Logf(`--- brokenlinks: %s`, tcase.scanUrl)
-		var brokenlinksOpts = jarink.BrokenlinksOptions{
+		var opts = brokenlinks.Options{
 			Url: tcase.scanUrl,
 		}
-		result, err = jarink.Brokenlinks(brokenlinksOpts)
+		result, err = brokenlinks.Scan(opts)
 		if err != nil {
 			test.Assert(t, tcase.scanUrl+` error`,
 				tcase.expError, err.Error())
@@ -113,26 +174,26 @@ func TestBrokenlinks_pastResult(t *testing.T) {
 	var testUrl = `http://` + testAddress
 
 	type testCase struct {
-		exp      map[string][]jarink.Broken
+		exp      map[string][]brokenlinks.Broken
 		expError string
-		opts     jarink.BrokenlinksOptions
+		opts     brokenlinks.Options
 	}
 
 	listCase := []testCase{{
 		// With invalid file.
-		opts: jarink.BrokenlinksOptions{
+		opts: brokenlinks.Options{
 			Url:            testUrl,
 			PastResultFile: `testdata/invalid`,
 		},
 		expError: `brokenlinks: open testdata/invalid: no such file or directory`,
 	}, {
 		// With valid file.
-		opts: jarink.BrokenlinksOptions{
+		opts: brokenlinks.Options{
 			Url:            testUrl,
 			PastResultFile: `testdata/past_result.json`,
 		},
-		exp: map[string][]jarink.Broken{
-			testUrl + `/page2`: []jarink.Broken{
+		exp: map[string][]brokenlinks.Broken{
+			testUrl + `/page2`: []brokenlinks.Broken{
 				{
 					Link: testUrl + `/broken.png`,
 					Code: http.StatusNotFound,
@@ -148,12 +209,12 @@ func TestBrokenlinks_pastResult(t *testing.T) {
 	}}
 
 	var (
-		result *jarink.BrokenlinksResult
+		result *brokenlinks.Result
 		err    error
 	)
 	for _, tcase := range listCase {
 		t.Logf(`--- brokenlinks: %s`, tcase.opts.Url)
-		result, err = jarink.Brokenlinks(tcase.opts)
+		result, err = brokenlinks.Scan(tcase.opts)
 		if err != nil {
 			test.Assert(t, tcase.opts.Url+` error`,
 				tcase.expError, err.Error())

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 M. Shulhan <ms@kilabit.info>
 // SPDX-License-Identifier: GPL-3.0-only
 
-package jarink
+package brokenlinks
 
 import (
 	"encoding/json"
@@ -20,7 +20,7 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
-type brokenlinksWorker struct {
+type worker struct {
 	// seenLink store the URL being or has been scanned and its HTTP
 	// status code.
 	seenLink map[string]int
@@ -30,11 +30,11 @@ type brokenlinksWorker struct {
 
 	// result contains the final result after all of the pages has been
 	// scanned.
-	result *BrokenlinksResult
+	result *Result
 
 	// pastResult containts the past scan result, loaded from file
-	// [BrokenlinksOptions.PastResultFile].
-	pastResult *BrokenlinksResult
+	// [Options.PastResultFile].
+	pastResult *Result
 
 	// The base URL that will be joined to relative or absolute
 	// links or image.
@@ -45,18 +45,18 @@ type brokenlinksWorker struct {
 
 	log *log.Logger
 
-	opts BrokenlinksOptions
+	opts Options
 
 	// wg sync the goroutine scanner.
 	wg sync.WaitGroup
 }
 
-func newWorker(opts BrokenlinksOptions) (wrk *brokenlinksWorker, err error) {
-	wrk = &brokenlinksWorker{
+func newWorker(opts Options) (wrk *worker, err error) {
+	wrk = &worker{
 		opts:     opts,
 		seenLink: map[string]int{},
 		resultq:  make(chan map[string]linkQueue, 100),
-		result:   newBrokenlinksResult(),
+		result:   newResult(),
 		log:      log.New(os.Stderr, ``, log.LstdFlags),
 	}
 
@@ -83,7 +83,7 @@ func newWorker(opts BrokenlinksOptions) (wrk *brokenlinksWorker, err error) {
 		return nil, err
 	}
 
-	wrk.pastResult = newBrokenlinksResult()
+	wrk.pastResult = newResult()
 	err = json.Unmarshal(pastresult, &wrk.pastResult)
 	if err != nil {
 		return nil, err
@@ -92,7 +92,7 @@ func newWorker(opts BrokenlinksOptions) (wrk *brokenlinksWorker, err error) {
 	return wrk, nil
 }
 
-func (wrk *brokenlinksWorker) run() (result *BrokenlinksResult, err error) {
+func (wrk *worker) run() (result *Result, err error) {
 	if wrk.pastResult == nil {
 		result, err = wrk.scanAll()
 	} else {
@@ -101,8 +101,8 @@ func (wrk *brokenlinksWorker) run() (result *BrokenlinksResult, err error) {
 	return result, err
 }
 
-// scanAll scan all pages start from [BrokenlinksOptions.Url].
-func (wrk *brokenlinksWorker) scanAll() (result *BrokenlinksResult, err error) {
+// scanAll scan all pages start from [Options.Url].
+func (wrk *worker) scanAll() (result *Result, err error) {
 	// Scan the first URL to make sure that the server is reachable.
 	var firstLinkq = linkQueue{
 		parentUrl: nil,
@@ -160,9 +160,9 @@ func (wrk *brokenlinksWorker) scanAll() (result *BrokenlinksResult, err error) {
 }
 
 // scanPastResult scan only pages reported inside
-// [BrokenlinksResult.BrokenLinks].
-func (wrk *brokenlinksWorker) scanPastResult() (
-	result *BrokenlinksResult, err error,
+// [Result.BrokenLinks].
+func (wrk *worker) scanPastResult() (
+	result *Result, err error,
 ) {
 	go func() {
 		for page := range wrk.pastResult.BrokenLinks {
@@ -210,7 +210,7 @@ func (wrk *brokenlinksWorker) scanPastResult() (
 //	"http://example.tld/page": {status=0}
 //	"http://example.tld/image.png": {status=0}
 //	"http://bad:domain/image.png": {status=700}
-func (wrk *brokenlinksWorker) processResult(
+func (wrk *worker) processResult(
 	resultq map[string]linkQueue, listWaitStatus []linkQueue,
 ) (
 	newList []linkQueue,
@@ -267,7 +267,7 @@ func (wrk *brokenlinksWorker) processResult(
 	return newList
 }
 
-func (wrk *brokenlinksWorker) markBroken(linkq linkQueue) {
+func (wrk *worker) markBroken(linkq linkQueue) {
 	var parentUrl = linkq.parentUrl.String()
 	var listBroken = wrk.result.BrokenLinks[parentUrl]
 	var brokenLink = Broken{
@@ -284,7 +284,7 @@ func (wrk *brokenlinksWorker) markBroken(linkq linkQueue) {
 }
 
 // scan fetch the HTML page or image to check if its valid.
-func (wrk *brokenlinksWorker) scan(linkq linkQueue) {
+func (wrk *worker) scan(linkq linkQueue) {
 	defer func() {
 		if wrk.opts.IsVerbose && linkq.errScan != nil {
 			wrk.log.Printf("error: %d %s error=%v\n", linkq.status,
@@ -374,7 +374,7 @@ func (wrk *brokenlinksWorker) scan(linkq linkQueue) {
 	go wrk.pushResult(resultq)
 }
 
-func (wrk *brokenlinksWorker) fetch(linkq linkQueue) (
+func (wrk *worker) fetch(linkq linkQueue) (
 	httpResp *http.Response,
 	err error,
 ) {
@@ -406,7 +406,7 @@ func (wrk *brokenlinksWorker) fetch(linkq linkQueue) (
 	return nil, err
 }
 
-func (wrk *brokenlinksWorker) processLink(parentUrl *url.URL, val string, kind atom.Atom) (
+func (wrk *worker) processLink(parentUrl *url.URL, val string, kind atom.Atom) (
 	linkq *linkQueue,
 ) {
 	if len(val) == 0 {
@@ -454,7 +454,7 @@ func (wrk *brokenlinksWorker) processLink(parentUrl *url.URL, val string, kind a
 	return linkq
 }
 
-func (wrk *brokenlinksWorker) pushResult(resultq map[string]linkQueue) {
+func (wrk *worker) pushResult(resultq map[string]linkQueue) {
 	var tick = time.NewTicker(100 * time.Millisecond)
 	for {
 		select {
