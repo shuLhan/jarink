@@ -160,12 +160,12 @@ func (wrk *brokenlinksWorker) scanAll() (result *BrokenlinksResult, err error) {
 }
 
 // scanPastResult scan only pages reported inside
-// [BrokenlinksResult.PageLinks].
+// [BrokenlinksResult.BrokenLinks].
 func (wrk *brokenlinksWorker) scanPastResult() (
 	result *BrokenlinksResult, err error,
 ) {
 	go func() {
-		for page := range wrk.pastResult.PageLinks {
+		for page := range wrk.pastResult.BrokenLinks {
 			var linkq = linkQueue{
 				parentUrl: nil,
 				url:       page,
@@ -269,7 +269,7 @@ func (wrk *brokenlinksWorker) processResult(
 
 func (wrk *brokenlinksWorker) markBroken(linkq linkQueue) {
 	var parentUrl = linkq.parentUrl.String()
-	var listBroken = wrk.result.PageLinks[parentUrl]
+	var listBroken = wrk.result.BrokenLinks[parentUrl]
 	var brokenLink = Broken{
 		Link: linkq.url,
 		Code: linkq.status,
@@ -278,7 +278,7 @@ func (wrk *brokenlinksWorker) markBroken(linkq linkQueue) {
 		brokenLink.Error = linkq.errScan.Error()
 	}
 	listBroken = append(listBroken, brokenLink)
-	wrk.result.PageLinks[parentUrl] = listBroken
+	wrk.result.BrokenLinks[parentUrl] = listBroken
 
 	wrk.seenLink[linkq.url] = linkq.status
 }

@@ -101,9 +101,9 @@ func TestBrokenlinks(t *testing.T) {
 				tcase.expError, err.Error())
 			continue
 		}
-		//got, _ := json.MarshalIndent(result.PageLinks, ``, `  `)
+		//got, _ := json.MarshalIndent(result.BrokenLinks, ``, `  `)
 		//t.Logf(`got=%s`, got)
-		test.Assert(t, tcase.scanUrl, tcase.exp, result.PageLinks)
+		test.Assert(t, tcase.scanUrl, tcase.exp, result.BrokenLinks)
 	}
 }
 
@@ -159,8 +159,8 @@ func TestBrokenlinks_pastResult(t *testing.T) {
 				tcase.expError, err.Error())
 			continue
 		}
-		got, _ := json.MarshalIndent(result.PageLinks, ``, `  `)
+		got, _ := json.MarshalIndent(result.BrokenLinks, ``, `  `)
 		t.Logf(`got=%s`, got)
-		test.Assert(t, tcase.opts.Url, tcase.exp, result.PageLinks)
+		test.Assert(t, tcase.opts.Url, tcase.exp, result.BrokenLinks)
 	}
 }

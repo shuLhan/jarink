@@ -32,18 +32,18 @@ type BrokenlinksOptions struct {
 
 // BrokenlinksResult store the result of scanning for broken links.
 type BrokenlinksResult struct {
-	// PageLinks store the page and its broken links.
-	PageLinks map[string][]Broken `json:"page_links"`
+	// BrokenLinks store the page and its broken links.
+	BrokenLinks map[string][]Broken `json:"broken_links"`
 }
 
 func newBrokenlinksResult() *BrokenlinksResult {
 	return &BrokenlinksResult{
-		PageLinks: map[string][]Broken{},
+		BrokenLinks: map[string][]Broken{},
 	}
 }
 
 func (result *BrokenlinksResult) sort() {
-	for _, listBroken := range result.PageLinks {
+	for _, listBroken := range result.BrokenLinks {
 		slices.SortFunc(listBroken, func(a, b Broken) int {
 			return strings.Compare(a.Link, b.Link)
 		})
