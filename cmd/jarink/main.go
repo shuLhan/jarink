@@ -20,12 +20,16 @@ func main() {
 
 	var (
 		optIgnoreStatus string
+		optInsecure     bool
 		optIsVerbose    bool
 		optPastResult   string
 	)
 
 	flag.StringVar(&optIgnoreStatus, `ignore-status`, ``,
 		`Comma separated HTTP response status code to be ignored.`)
+
+	flag.BoolVar(&optInsecure, `insecure`, false,
+		`Do not report as error on server with invalid certificates.`)
 
 	flag.BoolVar(&optIsVerbose, `verbose`, false,
 		`Print additional information while running.`)
@@ -41,6 +45,7 @@ func main() {
 	case `brokenlinks`:
 		var opts = brokenlinks.Options{
 			IgnoreStatus:   optIgnoreStatus,
+			Insecure:       optInsecure,
 			IsVerbose:      optIsVerbose,
 			PastResultFile: optPastResult,
 		}

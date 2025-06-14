@@ -24,6 +24,9 @@ type Options struct {
 	ignoreStatus []int
 
 	IsVerbose bool
+
+	// Insecure do not report error on server with invalid certificates.
+	Insecure bool
 }
 
 func (opts *Options) init() (err error) {

@@ -16,13 +16,21 @@ import (
 	"git.sr.ht/~shulhan/jarink/brokenlinks"
 )
 
-// The test run two web servers that serve content on "testdata/web/".
+// The test run three web servers that serve content on "testdata/web/".
 // The first web server is the one that we want to scan.
 // The second web server is external web server, where HTML pages should not
 // be parsed.
+// The third web server is with insecure, self-signed TLS, for testing
+// "insecure" option.
+//
+// Command to generate certificate:
+//	$ openssl genrsa -out 127.0.0.1.key
+//	$ openssl x509 -new -key=127.0.0.1.key -subj="/CN=shulhan" \
+//		-days=3650 -out=127.0.0.1.pem
 
 const testAddress = `127.0.0.1:11836`
 const testExternalAddress = `127.0.0.1:11900`
+const testInsecureAddress = `127.0.0.1:11838`
 
 func TestMain(m *testing.M) {
 	log.SetFlags(0)
@@ -31,12 +39,17 @@ func TestMain(m *testing.M) {
 
 	go testServer(fshandle)
 	go testExternalServer(fshandle)
+	go testInsecureServer(fshandle)
 
 	var err = libnet.WaitAlive(`tcp`, testAddress, 5*time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
 	err = libnet.WaitAlive(`tcp`, testExternalAddress, 5*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = libnet.WaitAlive(`tcp`, testInsecureAddress, 5*time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -81,6 +94,24 @@ func testExternalServer(fshandle http.Handler) {
 	}
 }
 
+func testInsecureServer(fshandle http.Handler) {
+	var mux = http.NewServeMux()
+	mux.Handle(`/`, fshandle)
+	var testServer = &http.Server{
+		Addr:           testInsecureAddress,
+		Handler:        mux,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	var certFile = `testdata/127.0.0.1.pem`
+	var keyFile = `testdata/127.0.0.1.key`
+	var err = testServer.ListenAndServeTLS(certFile, keyFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func TestBrokenlinks(t *testing.T) {
 	var testUrl = `http://` + testAddress
 
@@ -104,6 +135,7 @@ func TestBrokenlinks(t *testing.T) {
 		opts: brokenlinks.Options{
 			Url:          testUrl,
 			IgnoreStatus: `403`,
+			Insecure:     true,
 		},
 		exp: map[string][]brokenlinks.Broken{
 			testUrl: []brokenlinks.Broken{

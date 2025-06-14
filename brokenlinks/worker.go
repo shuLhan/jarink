@@ -4,6 +4,7 @@
 package brokenlinks
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -46,6 +47,8 @@ type worker struct {
 
 	log *log.Logger
 
+	httpc *http.Client
+
 	opts Options
 
 	// wg sync the goroutine scanner.
@@ -53,12 +56,31 @@ type worker struct {
 }
 
 func newWorker(opts Options) (wrk *worker, err error) {
+	var netDial = &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+	var tlsConfig = &tls.Config{
+		InsecureSkipVerify: opts.Insecure,
+	}
+
 	wrk = &worker{
 		opts:     opts,
 		seenLink: map[string]int{},
 		resultq:  make(chan map[string]linkQueue, 100),
 		result:   newResult(),
 		log:      log.New(os.Stderr, ``, log.LstdFlags),
+		httpc: &http.Client{
+			Transport: &http.Transport{
+				DialContext:           netDial.DialContext,
+				ExpectContinueTimeout: 1 * time.Second,
+				ForceAttemptHTTP2:     true,
+				IdleConnTimeout:       90 * time.Second,
+				MaxIdleConns:          100,
+				TLSClientConfig:       tlsConfig,
+				TLSHandshakeTimeout:   10 * time.Second,
+			},
+		},
 	}
 
 	wrk.scanUrl, err = url.Parse(opts.Url)
@@ -390,12 +412,12 @@ func (wrk *worker) fetch(linkq linkQueue) (
 			if wrk.opts.IsVerbose {
 				wrk.log.Printf("scan: HEAD %s\n", linkq.url)
 			}
-			httpResp, err = http.Head(linkq.url)
+			httpResp, err = wrk.httpc.Head(linkq.url)
 		} else {
 			if wrk.opts.IsVerbose {
 				wrk.log.Printf("scan: GET %s\n", linkq.url)
 			}
-			httpResp, err = http.Get(linkq.url)
+			httpResp, err = wrk.httpc.Get(linkq.url)
 		}
 		if err == nil {
 			return httpResp, nil

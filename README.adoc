@@ -49,6 +49,9 @@ This command accept the following options,
 `-ignore-status=<comma separated HTTP status code>`::
 List of HTTP status code that will be ignored during scan.
 
+`-insecure`::
+Do not report as error on server with invalid certificates.
+
 `-past-result=<path to JSON file>`::
 Scan only the pages reported by result from past scan based
 on the content in JSON file.
