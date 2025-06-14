@@ -7,5 +7,5 @@ import (
 	_ "embed"
 )
 
-//go:embed README.adoc
+//go:embed README
 var GoEmbedReadme string

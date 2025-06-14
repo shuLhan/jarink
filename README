@@ -1,0 +1,119 @@
+= Jarink
+:sectanchors:
+:toc:
+
+Jarink is a program to help web administrator and developers to inspect
+and maintains their website.
+
+== Synopsis
+
+        jarink [OPTIONS] <COMMAND> <args...>
+
+Available command,
+
+        brokenlinks - scan the website for broken links (page and images).
+        help        - print the usage of the command.
+
+== Usage
+
+=== brokenlinks command
+
+	[OPTIONS] brokenlinks <URL>
+
+Scan for broken links on the web server pointed by URL.
+Links will be scanned on anchor href attribute ("<a href=...>") or
+on the image src attribute ("<img src=...").
+
+The URL can be start from base or from sub path.
+Scanning from path only report brokenlinks on that path and their
+sub paths.
+
+Once finished it will print the page and list of broken links in
+JSON format to standard output,
+
+----
+{
+	"$PAGE": [{
+		"link": <string>,
+		"error": <string>,
+		"code": <integer>
+	},
+	...
+	],
+	...
+}
+----
+
+This command accept the following options,
+
+`-ignore-status=<comma separated HTTP status code>`::
+List of HTTP status code that will be ignored during scan.
+
+`-insecure`::
+Do not report as error on server with invalid certificates.
+
+`-past-result=<path to JSON file>`::
+Scan only the pages reported by result from past scan based
+on the content in JSON file.
+This minimize the time to re-scan the pages once we have fixed the URLs.
+
+`-verbose`::
+Print the page that being scanned to standard error.
+
+
+== Examples
+
+Given a website that have the following pages,
+
+- web.tld (base)
+- web.tld/page1
+- web.tld/page1/sub1
+- web.tld/page2
+- web.tld/page2/sub1
+
+
+The following command will scan all of the pages in the website web.tld.
+
+----
+$ jarink brokenlinks https://web.tld
+----
+
+Invoking brokenlinks on path "/page2" only scan "/page2" and "/page2/sub1".
+
+----
+$ jarink brokenlinks https://web.tld/page2
+----
+
+Ignore HTTP status code 403 and 418,
+
+----
+$ jarink -ignore-status=403,418 brokenlinks https://web.tld/page2
+----
+
+
+== Notes
+
+jarink version 0.1.0.
+
+Source code - https://git.sr.ht/~shulhan/jarink
+
+
+== License
+
+This software is licensed under GPL 3.0.
+
+Copyright 2025 Shulhan <ms@kilabit.info>
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option)
+any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program.
+If not, see <http://www.gnu.org/licenses/>.
