@@ -7,5 +7,7 @@ import (
 	_ "embed"
 )
 
+// GoEmbedReadme embed the README for showing the usage of program.
+//
 //go:embed README
 var GoEmbedReadme string
