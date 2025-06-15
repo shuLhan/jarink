@@ -125,7 +125,7 @@ func TestBrokenlinks(t *testing.T) {
 		opts: brokenlinks.Options{
 			Url: `127.0.0.1:14594`,
 		},
-		expError: `Scan: invalid URL "127.0.0.1:14594"`,
+		expError: `Scan: Options: invalid URL "127.0.0.1:14594"`,
 	}, {
 		opts: brokenlinks.Options{
 			Url: `http://127.0.0.1:14594`,

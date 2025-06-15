@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -41,9 +40,6 @@ type worker struct {
 	// The base URL that will be joined to relative or absolute
 	// links or image.
 	baseUrl *url.URL
-
-	// The URL to scan.
-	scanUrl *url.URL
 
 	log *log.Logger
 
@@ -83,17 +79,9 @@ func newWorker(opts Options) (wrk *worker, err error) {
 		},
 	}
 
-	wrk.scanUrl, err = url.Parse(opts.Url)
-	if err != nil {
-		return nil, fmt.Errorf(`invalid URL %q`, opts.Url)
-	}
-	wrk.scanUrl.Path = strings.TrimSuffix(wrk.scanUrl.Path, `/`)
-	wrk.scanUrl.Fragment = ""
-	wrk.scanUrl.RawFragment = ""
-
 	wrk.baseUrl = &url.URL{
-		Scheme: wrk.scanUrl.Scheme,
-		Host:   wrk.scanUrl.Host,
+		Scheme: wrk.opts.scanUrl.Scheme,
+		Host:   wrk.opts.scanUrl.Host,
 	}
 
 	if opts.PastResultFile == "" {
@@ -129,7 +117,7 @@ func (wrk *worker) scanAll() (result *Result, err error) {
 	// Scan the first URL to make sure that the server is reachable.
 	var firstLinkq = linkQueue{
 		parentUrl: nil,
-		url:       wrk.scanUrl.String(),
+		url:       wrk.opts.scanUrl.String(),
 		status:    http.StatusProcessing,
 	}
 	wrk.seenLink[firstLinkq.url] = http.StatusProcessing

@@ -6,13 +6,17 @@ package brokenlinks
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 )
 
 // Options define the options for scanning broken links.
 type Options struct {
-	Url            string
+	// The URL to be scanned.
+	Url     string
+	scanUrl *url.URL
+
 	PastResultFile string
 
 	// IgnoreStatus comma separated list HTTP status code that will be
@@ -30,11 +34,19 @@ type Options struct {
 }
 
 func (opts *Options) init() (err error) {
-	var (
-		logp     = `Options`
-		listCode = strings.Split(opts.IgnoreStatus, ",")
-		val      string
-	)
+	var logp = `Options`
+
+	opts.scanUrl, err = url.Parse(opts.Url)
+	if err != nil {
+		return fmt.Errorf(`%s: invalid URL %q`, logp, opts.Url)
+	}
+	opts.scanUrl.Path = strings.TrimSuffix(opts.scanUrl.Path, `/`)
+	opts.scanUrl.Fragment = ""
+	opts.scanUrl.RawFragment = ""
+
+	var listCode = strings.Split(opts.IgnoreStatus, ",")
+	var val string
+
 	for _, val = range listCode {
 		val = strings.TrimSpace(val)
 		if val == "" {
@@ -49,7 +61,6 @@ func (opts *Options) init() (err error) {
 			code > http.StatusNetworkAuthenticationRequired {
 			return fmt.Errorf(`%s: status code %s out of range`, logp, val)
 		}
-
 		opts.ignoreStatus = append(opts.ignoreStatus, int(code))
 	}
 	return nil

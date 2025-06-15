@@ -37,14 +37,14 @@ type linkQueue struct {
 
 // checkExternal set the isExternal field to be true if
 //
-// (1) [linkQueue.url] does not start with [worker.scanUrl]
+// (1) [linkQueue.url] does not start with [Options.Url]
 //
 // (2) linkQueue is from scanPastResult, indicated by non-nil
 // [worker.pastResult].
 // In this case, we did not want to scan the other pages from the same scanUrl
 // domain.
 func (linkq *linkQueue) checkExternal(wrk *worker) {
-	if !strings.HasPrefix(linkq.url, wrk.scanUrl.String()) {
+	if !strings.HasPrefix(linkq.url, wrk.opts.scanUrl.String()) {
 		linkq.isExternal = true
 		return
 	}
