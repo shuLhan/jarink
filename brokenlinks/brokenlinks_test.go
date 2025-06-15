@@ -175,8 +175,8 @@ func TestBrokenlinks(t *testing.T) {
 			},
 		},
 	}, {
-		// Scanning on "/path" should not scan the the "/" or other
-		// pages other than below of "/path" itself.
+		// Scanning on "/page2" should not scan the the "/" or other
+		// pages other than below of "/page2" itself.
 		opts: brokenlinks.Options{
 			Url: testUrl + `/page2`,
 		},
