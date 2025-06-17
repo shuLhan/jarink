@@ -59,7 +59,7 @@ func (opts *Options) init() (err error) {
 		}
 		if code < http.StatusContinue ||
 			code > http.StatusNetworkAuthenticationRequired {
-			return fmt.Errorf(`%s: status code %s out of range`, logp, val)
+			return fmt.Errorf(`%s: unknown status code %q`, logp, val)
 		}
 		opts.ignoreStatus = append(opts.ignoreStatus, int(code))
 	}

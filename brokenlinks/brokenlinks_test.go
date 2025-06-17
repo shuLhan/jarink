@@ -112,7 +112,7 @@ func testInsecureServer(fshandle http.Handler) {
 	}
 }
 
-func TestBrokenlinks(t *testing.T) {
+func TestScan(t *testing.T) {
 	var testUrl = `http://` + testAddress
 
 	type testCase struct {
@@ -131,6 +131,18 @@ func TestBrokenlinks(t *testing.T) {
 			Url: `http://127.0.0.1:14594`,
 		},
 		expError: `Scan: Get "http://127.0.0.1:14594": dial tcp 127.0.0.1:14594: connect: connection refused`,
+	}, {
+		opts: brokenlinks.Options{
+			Url:          testUrl,
+			IgnoreStatus: "abc",
+		},
+		expError: `Scan: Options: invalid status code "abc"`,
+	}, {
+		opts: brokenlinks.Options{
+			Url:          testUrl,
+			IgnoreStatus: "50",
+		},
+		expError: `Scan: Options: unknown status code "50"`,
 	}, {
 		opts: brokenlinks.Options{
 			Url:          testUrl,
@@ -214,9 +226,9 @@ func TestBrokenlinks(t *testing.T) {
 	}
 }
 
-// Test running Brokenlinks with file PastResultFile is set.
+// Test scanning with [Options.PastResultFile] is set.
 // The PastResultFile is modified to only report errors on "/page2".
-func TestBrokenlinks_pastResult(t *testing.T) {
+func TestScan_pastResult(t *testing.T) {
 	var testUrl = `http://` + testAddress
 
 	type testCase struct {
