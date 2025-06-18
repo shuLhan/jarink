@@ -145,49 +145,29 @@ func (wrk *worker) scanAll() (result *Result, err error) {
 		go wrk.scan(linkq)
 	}
 
-	var tick = time.NewTicker(500 * time.Millisecond)
-	var listWaitStatus []linkQueue
-	var isScanning = true
-	for isScanning {
-		select {
-		case resultq := <-wrk.resultq:
-			listWaitStatus = wrk.processResult(resultq, listWaitStatus)
-
-		case <-tick.C:
-			wrk.wg.Wait()
-			if len(wrk.resultq) != 0 {
-				continue
-			}
-			if len(listWaitStatus) != 0 {
-				// There are links that still waiting for
-				// scanning to be completed.
-				continue
-			}
-			isScanning = false
-		}
-	}
-	wrk.result.sort()
+	wrk.processAndWait()
 	return wrk.result, nil
 }
 
 // scanPastResult scan only pages reported inside
 // [Result.BrokenLinks].
-func (wrk *worker) scanPastResult() (
-	result *Result, err error,
-) {
-	go func() {
-		for page := range wrk.pastResult.BrokenLinks {
-			var linkq = linkQueue{
-				parentUrl: nil,
-				url:       page,
-				status:    http.StatusProcessing,
-			}
-			wrk.seenLink[linkq.url] = http.StatusProcessing
-			wrk.wg.Add(1)
-			go wrk.scan(linkq)
+func (wrk *worker) scanPastResult() (result *Result, err error) {
+	for page := range wrk.pastResult.BrokenLinks {
+		var linkq = linkQueue{
+			parentUrl: nil,
+			url:       page,
+			status:    http.StatusProcessing,
 		}
-	}()
+		wrk.seenLink[linkq.url] = http.StatusProcessing
+		wrk.wg.Add(1)
+		go wrk.scan(linkq)
+	}
 
+	wrk.processAndWait()
+	return wrk.result, nil
+}
+
+func (wrk *worker) processAndWait() {
 	var tick = time.NewTicker(500 * time.Millisecond)
 	var listWaitStatus []linkQueue
 	var isScanning = true
@@ -210,7 +190,6 @@ func (wrk *worker) scanPastResult() (
 		}
 	}
 	wrk.result.sort()
-	return wrk.result, nil
 }
 
 // processResult the resultq contains the original URL being scanned
