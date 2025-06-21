@@ -5,6 +5,7 @@ package brokenlinks
 
 import (
 	"fmt"
+	"log"
 )
 
 const Version = `0.1.0`
@@ -32,6 +33,11 @@ func Scan(opts Options) (result *Result, err error) {
 	result, err = wrk.run()
 	if err != nil {
 		return nil, fmt.Errorf(`%s: %w`, logp, err)
+	}
+
+	err = wrk.cache.Save()
+	if err != nil {
+		log.Printf(`%s: %s`, logp, err)
 	}
 
 	return result, nil

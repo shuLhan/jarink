@@ -10,11 +10,16 @@ SPDX-License-Identifier: GPL-3.0-only
     <img width="200" src="" />
     <a href="/page2">Page 2</a>
     <a href="/broken.html">Broken HTML</a>
+
+    <!-- External link -->
     <a href="http://127.0.0.1:11900">External URL</a>
+
     <!-- Error when fetching with GET -->
     <a href="http:/127.0.0.1:11836">Invalid external URL</a>
+
     <!-- Error when parsing URL -->
     <a href="http://127.0.0.1:abc">Invalid URL port</a>
+
     <!-- Fragment should be skipped and cleaned up -->
     <a href="#goto_a">Same with href to "/"</a>
     <a href="/page2#goto_a">Same with href to "/page2"</a>

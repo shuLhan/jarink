@@ -5,7 +5,6 @@ package brokenlinks
 
 import (
 	"net/url"
-	"strings"
 
 	"golang.org/x/net/html/atom"
 )
@@ -33,23 +32,7 @@ type linkQueue struct {
 	// 200 - 211: OK.
 	// 400 - 511: Error.
 	status int
-}
 
-// checkExternal set the isExternal field to be true if
-//
-// (1) [linkQueue.url] does not start with [Options.Url]
-//
-// (2) linkQueue is from scanPastResult, indicated by non-nil
-// [worker.pastResult].
-// In this case, we did not want to scan the other pages from the same scanUrl
-// domain.
-func (linkq *linkQueue) checkExternal(wrk *worker) {
-	if !strings.HasPrefix(linkq.url, wrk.opts.scanUrl.String()) {
-		linkq.isExternal = true
-		return
-	}
-	if wrk.pastResult != nil {
-		linkq.isExternal = true
-		return
-	}
+	// Size of the page, derived from HTTP response ContentLength.
+	size int64
 }

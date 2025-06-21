@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"git.sr.ht/~shulhan/pakakeh.go/lib/test"
 
 	"git.sr.ht/~shulhan/jarink/brokenlinks"
+	"git.sr.ht/~shulhan/jarink/internal"
 )
 
 // The test run four web servers.
@@ -41,6 +43,16 @@ const testAddressSlow = `127.0.0.1:11839`
 
 func TestMain(m *testing.M) {
 	log.SetFlags(0)
+
+	var orgCacheFile = internal.CacheFile
+	var tmpCacheFile = filepath.Join(os.TempDir(), `cache.json`)
+	internal.CacheFile = func() (string, error) {
+		return tmpCacheFile, nil
+	}
+	defer func() {
+		internal.CacheFile = orgCacheFile
+	}()
+
 	var httpDirWeb = http.Dir(`testdata/web`)
 	var fshandle = http.FileServer(httpDirWeb)
 
@@ -234,6 +246,7 @@ func TestScan(t *testing.T) {
 			Url:          testUrl,
 			IgnoreStatus: `403`,
 			Insecure:     true,
+			IsVerbose:    true,
 		},
 		exp: map[string][]brokenlinks.Broken{
 			testUrl: []brokenlinks.Broken{
@@ -276,7 +289,8 @@ func TestScan(t *testing.T) {
 		// Scanning on "/page2" should not scan the the "/" or other
 		// pages other than below of "/page2" itself.
 		opts: brokenlinks.Options{
-			Url: testUrl + `/page2`,
+			Url:       testUrl + `/page2`,
+			IsVerbose: true,
 		},
 		exp: map[string][]brokenlinks.Broken{
 			testUrl + `/page2`: []brokenlinks.Broken{
@@ -405,4 +419,35 @@ func TestScan_slow(t *testing.T) {
 		},
 	}
 	test.Assert(t, `TestScan_slow`, expResult, gotResult)
+}
+
+func TestBrokenlinks_cache(t *testing.T) {
+	var orgCacheFile = internal.CacheFile
+	var gotCacheFile = filepath.Join(t.TempDir(), `cache.json`)
+	var expCacheFile = filepath.Join(`testdata`, `exp_cache.json`)
+	defer func() {
+		internal.CacheFile = orgCacheFile
+	}()
+	internal.CacheFile = func() (string, error) {
+		return gotCacheFile, nil
+	}
+
+	var testUrl = `http://` + testAddress
+	var opts = brokenlinks.Options{
+		Url:          testUrl,
+		IgnoreStatus: `403`,
+		Insecure:     true,
+	}
+
+	var err error
+	_, err = brokenlinks.Scan(opts)
+	gotCache, err := os.ReadFile(gotCacheFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expCache, err := os.ReadFile(expCacheFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	test.Assert(t, `cache`, string(gotCache), string(expCache))
 }

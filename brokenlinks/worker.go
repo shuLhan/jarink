@@ -19,6 +19,8 @@ import (
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
+
+	"git.sr.ht/~shulhan/jarink"
 )
 
 type worker struct {
@@ -40,6 +42,9 @@ type worker struct {
 	// The base URL that will be joined to relative or absolute
 	// links or image.
 	baseUrl *url.URL
+
+	// cache of scanned links.
+	cache *jarink.Cache
 
 	log *log.Logger
 
@@ -77,6 +82,11 @@ func newWorker(opts Options) (wrk *worker, err error) {
 				TLSHandshakeTimeout:   10 * time.Second,
 			},
 		},
+	}
+
+	wrk.cache, err = jarink.LoadCache()
+	if err != nil {
+		return nil, err
 	}
 
 	wrk.baseUrl = &url.URL{
@@ -135,9 +145,14 @@ func (wrk *worker) scanAll() (result *Result, err error) {
 			wrk.seenLink[linkq.url] = linkq.status
 			continue
 		}
-		if linkq.status >= http.StatusBadRequest {
-			wrk.markBroken(linkq)
-			continue
+
+		if linkq.isExternal {
+			var scannedLink = wrk.cache.Get(linkq.url)
+			if scannedLink != nil {
+				linkq.status = scannedLink.ResponseCode
+				wrk.seen(linkq)
+				continue
+			}
 		}
 
 		wrk.seenLink[linkq.url] = http.StatusProcessing
@@ -206,15 +221,25 @@ func (wrk *worker) processResult(
 	newList []linkQueue,
 ) {
 	for _, linkq := range resultq {
-		if linkq.status >= http.StatusBadRequest {
-			wrk.markBroken(linkq)
+		// Process the scanned page first.
+
+		if linkq.status != 0 {
+			wrk.seen(linkq)
+			if linkq.isExternal && linkq.status != StatusBadLink {
+				wrk.cache.Set(linkq.url, linkq.status, linkq.size)
+			}
 			continue
 		}
-		if linkq.status != 0 {
-			// linkq is the result of scan with
-			// non error status.
-			wrk.seenLink[linkq.url] = linkq.status
-			continue
+
+		// Now process the links inside the page.
+
+		if linkq.isExternal {
+			var scannedLink = wrk.cache.Get(linkq.url)
+			if scannedLink != nil {
+				linkq.status = scannedLink.ResponseCode
+				wrk.seen(linkq)
+				continue
+			}
 		}
 
 		seenStatus, seen := wrk.seenLink[linkq.url]
@@ -255,6 +280,14 @@ func (wrk *worker) processResult(
 		}
 	}
 	return newList
+}
+
+func (wrk *worker) seen(linkq linkQueue) {
+	if linkq.status >= http.StatusBadRequest {
+		wrk.markBroken(linkq)
+		return
+	}
+	wrk.seenLink[linkq.url] = linkq.status
 }
 
 func (wrk *worker) markBroken(linkq linkQueue) {
@@ -299,6 +332,7 @@ func (wrk *worker) scan(linkq linkQueue) {
 	defer httpResp.Body.Close()
 
 	linkq.status = httpResp.StatusCode
+	linkq.size = httpResp.ContentLength
 	resultq[linkq.url] = linkq
 
 	if slices.Contains(wrk.opts.ignoreStatus, httpResp.StatusCode) {
@@ -361,7 +395,7 @@ func (wrk *worker) scan(linkq linkQueue) {
 		}
 		_, seen := resultq[nodeLink.url]
 		if !seen {
-			nodeLink.checkExternal(wrk)
+			wrk.checkExternal(nodeLink)
 			resultq[nodeLink.url] = *nodeLink
 		}
 	}
@@ -457,5 +491,21 @@ func (wrk *worker) pushResult(resultq map[string]linkQueue) {
 			return
 		case <-tick.C:
 		}
+	}
+}
+
+// checkExternal set the [linkQueue.isExternal] field to true if
+//
+// (1) [linkQueue.url] does not start with [Options.Url]
+// (2) linkQueue is not from scanPastResult, indicated by non-nil
+// [worker.pastResult].
+func (wrk *worker) checkExternal(linkq *linkQueue) {
+	if !strings.HasPrefix(linkq.url, wrk.opts.scanUrl.String()) {
+		linkq.isExternal = true
+		return
+	}
+	if wrk.pastResult != nil {
+		linkq.isExternal = true
+		return
 	}
 }
