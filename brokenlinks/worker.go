@@ -133,7 +133,10 @@ func (wrk *worker) scanAll() (result *Result, err error) {
 	wrk.seenLink[firstLinkq.url] = http.StatusProcessing
 
 	wrk.wg.Add(1)
-	go wrk.scan(firstLinkq)
+	go func() {
+		var resultq = wrk.scan(firstLinkq)
+		wrk.pushResult(resultq)
+	}()
 	wrk.wg.Wait()
 
 	var resultq = <-wrk.resultq
@@ -157,7 +160,10 @@ func (wrk *worker) scanAll() (result *Result, err error) {
 
 		wrk.seenLink[linkq.url] = http.StatusProcessing
 		wrk.wg.Add(1)
-		go wrk.scan(linkq)
+		go func() {
+			var resultq = wrk.scan(linkq)
+			wrk.pushResult(resultq)
+		}()
 	}
 
 	wrk.processAndWait()
@@ -175,7 +181,10 @@ func (wrk *worker) scanPastResult() (result *Result, err error) {
 		}
 		wrk.seenLink[linkq.url] = http.StatusProcessing
 		wrk.wg.Add(1)
-		go wrk.scan(linkq)
+		go func() {
+			var resultq = wrk.scan(linkq)
+			wrk.pushResult(resultq)
+		}()
 	}
 
 	wrk.processAndWait()
@@ -246,7 +255,10 @@ func (wrk *worker) processResult(
 		if !seen {
 			wrk.seenLink[linkq.url] = http.StatusProcessing
 			wrk.wg.Add(1)
-			go wrk.scan(linkq)
+			go func() {
+				var resultq = wrk.scan(linkq)
+				wrk.pushResult(resultq)
+			}()
 			continue
 		}
 		if seenStatus >= http.StatusBadRequest {
@@ -307,7 +319,7 @@ func (wrk *worker) markBroken(linkq linkQueue) {
 }
 
 // scan fetch the HTML page or image to check if its valid.
-func (wrk *worker) scan(linkq linkQueue) {
+func (wrk *worker) scan(linkq linkQueue) (resultq map[string]linkQueue) {
 	defer func() {
 		if wrk.opts.IsVerbose && linkq.errScan != nil {
 			wrk.log.Printf("error: %d %s error=%v\n", linkq.status,
@@ -316,8 +328,8 @@ func (wrk *worker) scan(linkq linkQueue) {
 		wrk.wg.Done()
 	}()
 
+	resultq = make(map[string]linkQueue)
 	var (
-		resultq  = map[string]linkQueue{}
 		httpResp *http.Response
 		err      error
 	)
@@ -326,8 +338,7 @@ func (wrk *worker) scan(linkq linkQueue) {
 		linkq.status = StatusBadLink
 		linkq.errScan = err
 		resultq[linkq.url] = linkq
-		go wrk.pushResult(resultq)
-		return
+		return resultq
 	}
 	defer httpResp.Body.Close()
 
@@ -336,16 +347,14 @@ func (wrk *worker) scan(linkq linkQueue) {
 	resultq[linkq.url] = linkq
 
 	if slices.Contains(wrk.opts.ignoreStatus, httpResp.StatusCode) {
-		return
+		return nil
 	}
 
 	if httpResp.StatusCode >= http.StatusBadRequest {
-		go wrk.pushResult(resultq)
-		return
+		return resultq
 	}
 	if linkq.kind == atom.Img || linkq.isExternal {
-		go wrk.pushResult(resultq)
-		return
+		return resultq
 	}
 
 	var doc *html.Node
@@ -399,7 +408,7 @@ func (wrk *worker) scan(linkq linkQueue) {
 			resultq[nodeLink.url] = *nodeLink
 		}
 	}
-	go wrk.pushResult(resultq)
+	return resultq
 }
 
 func (wrk *worker) fetch(linkq linkQueue) (
@@ -483,6 +492,9 @@ func (wrk *worker) processLink(parentUrl *url.URL, val string, kind atom.Atom) (
 }
 
 func (wrk *worker) pushResult(resultq map[string]linkQueue) {
+	if len(resultq) == 0 {
+		return
+	}
 	var tick = time.NewTicker(100 * time.Millisecond)
 	for {
 		select {
