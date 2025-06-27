@@ -7,6 +7,9 @@ import (
 	_ "embed"
 )
 
+// Version of jarink program and module.
+var Version = `0.2.0`
+
 // GoEmbedReadme embed the README for showing the usage of program.
 //
 //go:embed README

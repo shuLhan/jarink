@@ -77,6 +77,10 @@ func main() {
 		log.Println(jarink.GoEmbedReadme)
 		return
 
+	case `version`:
+		log.Println(jarink.Version)
+		return
+
 	default:
 		log.Printf(`Missing or invalid command %q`, cmd)
 	}

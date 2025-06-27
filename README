@@ -9,10 +9,11 @@ and maintains their website.
 
         jarink [OPTIONS] <COMMAND> <args...>
 
-Available command,
+Available commands,
 
         brokenlinks - scan the website for broken links (page and images).
         help        - print the usage of the command.
+        version     - print the version of program.
 
 == Usage
 
