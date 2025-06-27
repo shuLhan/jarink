@@ -6,9 +6,46 @@
 :toc:
 
 Change log of each release of the jarink software.
+The latest release log is put on the top.
+
+Legend,
+
+* 🌱: New feature
+* 🌼: Enhancement
+
+[#jarink_v0_2_0]
+== jarink 0.2.0 (2025-06-27)
+
+**🌱 brokenlinks: add option to ignore list HTTP status code**.
+
+When link known to have an issues, one can ignore the status code during
+scanning broken links using "-ignore-status" option.
+
+**🌱 brokenlinks: add option "insecure"**.
+
+The "-insecure" option does not report an error on server with invalid
+certificates.
+
+**🌱 brokenlinks: implement caching for external URLs**.
+
+Any successful fetch on external URLs will be recorded into jarink
+cache file, located in user's cache directory.
+For example, in Linux it would be `$HOME/.cache/jarink/cache.json`.
+This help improve the future rescanning on the same or different target
+URL, minimizing network requests.
+
+**🌼 brokenlinks: reduce the number of goroutine on scan**.
+
+Previously, each scan run on one goroutine and the result is
+pushed using one goroutine.
+This makes one scan of link consume two goroutine.
+
+This changes the scan function to return the result and push it
+in the same goroutine.
+
 
 [#jarink_v0_1_0]
-== jarink 0.1.0
+== jarink 0.1.0 (2025-06-12)
 
 The first release of jarink provides the command "brokenlinks", to scan for
 broken links.
