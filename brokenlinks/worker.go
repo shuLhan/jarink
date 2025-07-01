@@ -420,12 +420,12 @@ func (wrk *worker) fetch(linkq linkQueue) (
 	for retry < 5 {
 		if linkq.kind == atom.Img {
 			if wrk.opts.IsVerbose {
-				wrk.log.Printf("scan: HEAD %s\n", linkq.url)
+				wrk.log.Printf("fetch: HEAD %s", linkq.url)
 			}
 			httpResp, err = wrk.httpc.Head(linkq.url)
 		} else {
 			if wrk.opts.IsVerbose {
-				wrk.log.Printf("scan: GET %s\n", linkq.url)
+				wrk.log.Printf("fetch: GET %s", linkq.url)
 			}
 			httpResp, err = wrk.httpc.Get(linkq.url)
 		}
@@ -438,7 +438,10 @@ func (wrk *worker) fetch(linkq linkQueue) (
 		}
 		if errDNS.Timeout() {
 			retry++
+			wrk.log.Printf(`fetch %s: %s (%d/%d)`, linkq.url, err, retry, maxRetry)
+			continue
 		}
+		break
 	}
 	return nil, err
 }

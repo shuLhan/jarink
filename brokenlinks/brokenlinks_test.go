@@ -264,6 +264,10 @@ func TestScan(t *testing.T) {
 					Link:  `http:/127.0.0.1:11836`,
 					Error: `Get "http:/127.0.0.1:11836": http: no Host in request URL`,
 					Code:  brokenlinks.StatusBadLink,
+				}, {
+					Link:  `https://domain`,
+					Error: `Get "https://domain": dial tcp: lookup domain: no such host`,
+					Code:  700,
 				},
 			},
 			testUrl + `/broken.html`: []brokenlinks.Broken{
