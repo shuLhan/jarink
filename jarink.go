@@ -8,7 +8,7 @@ import (
 )
 
 // Version of jarink program and module.
-var Version = `0.2.0`
+var Version = `0.2.1`
 
 // GoEmbedReadme embed the README for showing the usage of program.
 //
